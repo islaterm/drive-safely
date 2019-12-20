@@ -31,7 +31,7 @@
  * |                           |                           |                           | ``$``                |
  *
  * @author Ignacio Slater Muñoz
- * @version 1.0.1.1
+ * @version 1.0.1.2
  * @since 1.0
  */
 
@@ -175,7 +175,8 @@ static ssize_t pipe_read(struct file *filp, char *buf,
   }
 
   /* Transfiriendo datos hacia el espacio del usuario */
-  for (int k = 0; k < count; k++)
+  int k;
+  for (k = 0; k < count; k++)
   {
     if (copy_to_user(buf + k, pipe_buffer + out, 1) != 0)
     {
@@ -202,8 +203,8 @@ static ssize_t pipe_write(struct file *filp, const char *buf,
 
   printk("<1>write %p %ld\n", filp, count);
   m_lock(&mutex);
-
-  for (int k = 0; k < count; k++)
+  int k;
+  for (k = 0; k < count; k++)
   {
     while (size == MAX_SIZE)
     {
