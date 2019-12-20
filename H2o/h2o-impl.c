@@ -31,7 +31,7 @@
  * |                           |                           |                           | ``$``                |
  *
  * @author Ignacio Slater Muñoz
- * @version 1.0.2
+ * @version 1.0.3.1
  * @since 1.0
  */
 
@@ -59,11 +59,14 @@ static ssize_t h2o_read(struct file *filp, char *buf, size_t count, loff_t *f_po
 static ssize_t h2o_write(struct file *filp, const char *buf, size_t count, loff_t *f_pos);
 
 void h2o_exit(void);
-int h2o_init(void);
+/**
+ * Registers the H2O driver and initializes it's buffer.
+ */
+int initH2O(void);
 
 /* Structure that declares the usual file */
 /* access functions */
-struct file_operations h2o_fops = {
+struct file_operations pH2OFileOperations = {
   read : h2o_read,
   write : h2o_write,
   open : h2o_open,
@@ -71,13 +74,18 @@ struct file_operations h2o_fops = {
 };
 
 /* Declaration of the init and exit functions */
-module_init(h2o_init);
+module_init(initH2O);
 module_exit(h2o_exit);
 
 /*** El driver para lecturas sincronas *************************************/
 
-#define TRUE 1
-#define FALSE 0
+/**
+ * Definition for boolean values.
+ */
+static typedef enum bool {
+  false,
+  true
+}
 
 /* Global variables of the driver */
 
@@ -93,12 +101,12 @@ static int in, out, size;
 static KMutex mutex;
 static KCondition cond;
 
-int h2o_init(void)
+int initH2O(void)
 {
   int rc;
 
   /* Registering device */
-  rc = register_chrdev(h2oMajor, "h2o", &h2o_fops);
+  rc = register_chrdev(h2oMajor, "h2o", &pH2OFileOperations);
   if (rc < 0)
   {
     printk(
@@ -151,7 +159,7 @@ static int h2o_release(struct inode *inode, struct file *filp)
 }
 
 static ssize_t h2o_read(struct file *filp, char *buf,
-                         size_t ucount, loff_t *f_pos)
+                        size_t ucount, loff_t *f_pos)
 {
   ssize_t count = ucount;
 
@@ -197,7 +205,7 @@ epilog:
 }
 
 static ssize_t h2o_write(struct file *filp, const char *buf,
-                          size_t ucount, loff_t *f_pos)
+                         size_t ucount, loff_t *f_pos)
 {
   ssize_t count = ucount;
 
