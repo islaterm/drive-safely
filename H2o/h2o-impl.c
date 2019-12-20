@@ -31,7 +31,7 @@
  * |                           |                           |                           | ``$``                |
  *
  * @author Ignacio Slater Muñoz
- * @version 1.0.1
+ * @version 1.0.1.1
  * @since 1.0
  */
 
