@@ -5,10 +5,10 @@
 /// - Hydrogen particles are provided by performing a write operation on ``/dev/h2o``.
 /// - Oxygen particles are provided by performing a read operation on ``/dev/h2o``.
 ///
-/// Both writing and reading tasks must wait until a molecule is created to finish, but a 
+/// Both writing and reading tasks must wait until a molecule is created to finish, but a
 /// read operation can be interrupted with the ``<Control+C>`` signal.
 ///
-/// When the molecule is created, the read operation returns the concatenation of the 
+/// When the molecule is created, the read operation returns the concatenation of the
 /// parameters given to the write command in FIFO order.
 ///
 /// Example usage:
@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.3.6
+/// \version 1.0.3.7
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -57,9 +57,9 @@ MODULE_LICENSE("Dual BSD/GPL");
 /// Opens the H2O module.
 /// Each time the module is opened, it's file descriptor is different.
 ///
-/// \param inode 
+/// \param inode
 ///     a struct containing the characteristics of the file.
-/// \param pFile 
+/// \param pFile
 ///     the file descriptor.
 /// \returns 0 if the operation was succesfull; an error code otherwise.
 static int openH2O(struct inode *inode, struct file *pFile);
@@ -67,15 +67,46 @@ static int openH2O(struct inode *inode, struct file *pFile);
 /// Closes the H2O module.
 /// Each time the module is opened, it's file descriptor is different.
 ///
-/// \param inode 
+/// \param inode
 ///     a struct containing the characteristics of the file.
-/// \param pFile 
+/// \param pFile
 ///     the file descriptor.
+///
 /// \returns 0 if the operation was succesfull; an error code otherwise.
 static int releaseH2O(struct inode *inode, struct file *pFile);
 
-static ssize_t readH2O(struct file *pFile, char *buf, size_t count, loff_t *f_pos);
-static ssize_t writeH2O(struct file *pFile, const char *buf, size_t count, loff_t *f_pos);
+/// Reads a fragment of the file.
+/// If there are bytes remaining to be read from ``pFilePos``, then the function returns
+/// ``count`` and ``pFilePos`` is moved to the first unread byte.
+///
+/// \param pFile
+///     the file descriptor.
+/// \param buf
+///     the direction where the read data should be placed.
+/// \param count
+///     the maximum number of bytes to read.
+/// \param pFilePos
+///     the position from where the bytes should be read.
+///
+/// \returns the number of bytes read, 0 if it reaches the file's end or an error code if
+///     the read operation fails.
+static ssize_t readH2O(struct file *pFile, char *buf, size_t count, loff_t *pFilePos);
+
+/// Writes the buffer into the file.
+/// If the number of bytes to be written is larger than the maximum buffer size, then only
+/// the bytes that doesn't exceed the buffer size are written to the file and an error
+/// code is returned.
+///
+/// \param pFile
+///     the file descriptor.
+/// \param buf
+///     the characters data to be written in the file.
+/// \param count
+///     the maximum number of bytes to write.
+/// \param pFilePos
+///     the position from where the bytes should be written.
+static ssize_t writeH2O(struct file *pFile, const char *buf, size_t count,
+                        loff_t *pFilePos);
 
 /// Unregisters the H2O driver and releases it's buffer.
 void exitH2O(void);
@@ -167,8 +198,9 @@ static int releaseH2O(struct inode *inode, struct file *pFile)
 }
 
 static ssize_t readH2O(struct file *pFile, char *buf,
-                       size_t ucount, loff_t *f_pos)
+                       size_t ucount, loff_t *pFilePos)
 {
+  int k;
   ssize_t count = ucount;
 
   printk("<1>read %p %ld\n", pFile, count);
@@ -191,7 +223,6 @@ static ssize_t readH2O(struct file *pFile, char *buf,
   }
 
   /* Transfiriendo datos hacia el espacio del usuario */
-  int k;
   for (k = 0; k < count; k++)
   {
     if (copy_to_user(buf + k, bufferH2O + out, 1) != 0)
@@ -213,13 +244,13 @@ epilog:
 }
 
 static ssize_t writeH2O(struct file *pFile, const char *buf,
-                        size_t ucount, loff_t *f_pos)
+                        size_t ucount, loff_t *pFilePos)
 {
+  int k;
   ssize_t count = ucount;
 
   printk("<1>write %p %ld\n", pFile, count);
   m_lock(&mutex);
-  int k;
   for (k = 0; k < count; k++)
   {
     while (size == MAX_SIZE)
