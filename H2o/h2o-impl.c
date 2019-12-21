@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.3.7
+/// \version 1.0.3.8
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -51,7 +51,7 @@
 MODULE_LICENSE("Dual BSD/GPL");
 
 /// Size of the buffer to store data
-#define MAX_SIZE 10
+#define MAX_SIZE 8192
 
 #pragma region : Declaration of h2o.c functions
 /// Opens the H2O module.
@@ -92,7 +92,7 @@ static int releaseH2O(struct inode *inode, struct file *pFile);
 ///     the read operation fails.
 static ssize_t readH2O(struct file *pFile, char *buf, size_t count, loff_t *pFilePos);
 
-/// Writes the buffer into the file.
+/// Adds a hydrogen particle to the file.
 /// If the number of bytes to be written is larger than the maximum buffer size, then only
 /// the bytes that doesn't exceed the buffer size are written to the file and an error
 /// code is returned.
@@ -100,7 +100,7 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t count, loff_t *pFil
 /// \param pFile
 ///     the file descriptor.
 /// \param buf
-///     the characters data to be written in the file.
+///     the data to be written in the file.
 /// \param count
 ///     the maximum number of bytes to write.
 /// \param pFilePos
@@ -134,6 +134,7 @@ static int in, out, size;
 static KMutex mutex;
 /// Mutex condition
 static KCondition cond;
+static int hydrogens, oxygens;
 #pragma endregion
 
 #pragma region : Declaration of the init and exit functions
@@ -152,7 +153,8 @@ int initH2O(void)
     printk("<1>h2o: cannot obtain major number %d\n", h2oMajor);
     return returnCode;
   }
-
+  oxygens = 0;
+  hydrogens = 0;
   in = out = size = 0;
   m_init(&mutex);
   c_init(&cond);
@@ -243,41 +245,42 @@ epilog:
   return count;
 }
 
-static ssize_t writeH2O(struct file *pFile, const char *buf,
-                        size_t ucount, loff_t *pFilePos)
+static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
+                        loff_t *pFilePos)
 {
   int k;
   ssize_t count = ucount;
 
   printk("<1>write %p %ld\n", pFile, count);
   m_lock(&mutex);
+  hydrogens++;
   for (k = 0; k < count; k++)
   {
-    while (size == MAX_SIZE)
+    while (oxygens < 1)
     {
-      /* si el buffer esta lleno, el escritor espera */
-      if (c_wait(&cond, &mutex))
+      // The process waits if there's not enough oxygens to form a molecule
+      try:
       {
-        printk("<1>write interrupted\n");
-        count = -EINTR;
-        goto epilog;
+        if (c_wait(&cond, &mutex))
+        {
+          printk("<1>write interrupted\n");
+          count = -EINTR;
+          goto finally;
+        }
+        if (copy_from_user(bufferH2O + in, buf + k, 1) != 0)
+        {
+          // The buffer's adress is invalid
+          count = -EFAULT;
+          goto finally;
+        }
+        printk("<1>write byte %c (%d) at %d\n", bufferH2O[in], bufferH2O[in], in);
+        in = (in + 1) % MAX_SIZE;
+        size++;
+        c_broadcast(&cond);
       }
     }
-
-    if (copy_from_user(bufferH2O + in, buf + k, 1) != 0)
-    {
-      /* el valor de buf es una direccion invalida */
-      count = -EFAULT;
-      goto epilog;
-    }
-    printk("<1>write byte %c (%d) at %d\n",
-           bufferH2O[in], bufferH2O[in], in);
-    in = (in + 1) % MAX_SIZE;
-    size++;
-    c_broadcast(&cond);
   }
-
-epilog:
+finally:
   m_unlock(&mutex);
   return count;
 }
