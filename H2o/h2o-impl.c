@@ -1,174 +1,217 @@
-/**
- * Linux module to produce molecules of H2O.
- *
- * An H2O molecule needs 2 hydrogen particles and 1 particle of oxygen.
- * - Hydrogen particles are provided by performing a write operation on ``/dev/h2o``.
- * - Oxygen particles are provided by performing a read operation on ``/dev/h2o``.
- *
- * Both writing and reading tasks must wait until a molecule is created to finish, but a 
- * read operation can be interrupted with the ``<Control+C>`` signal.
- *
- * When the molecule is created, the read operation returns the concatenation of the 
- * parameters given to the write command in FIFO order.
- *
- * Example usage:
- *
- * | Shell 1                   | Shell 2                   | Shell 3                   | Shell 4              |
- * | ------------------------- | ------------------------- | ------------------------- | -------------------- |
- * | ``$ echo abc > /dev/h2o`` |                           |                           |                      |
- * |                           | ``$ echo def > /dev/h2o`` |                           |                      |
- * |                           |                           | ``$ echo ghi > /dev/h2o`` |                      |
- * |                           |                           |                           | ``$ cat < /dev/h20`` |
- * | ``$``                     | ``$``                     |                           | ``abc``              |
- * |                           |                           |                           | ``ghi``              |
- * |                           | ``$ echo jkl > /dev/h2o`` |                           |                      |
- * |                           |                           |                           |                      |
- * | ``$ echo mno > /dev/h2o`` |                           |                           |                      |
- * |                           |                           | ``$ echo pqr > /dev/h20`` |                      |
- * | ``$``                     |                           | ``$``                     | ``mno``              |
- * |                           |                           |                           | ``pqr``              |
- * |                           |                           |                           | ``<Control+C>``      |
- * |                           |                           |                           | ``$``                |
- *
- * @author Ignacio Slater Muñoz
- * @version 1.0.3.1
- * @since 1.0
- */
+///
+/// Linux module to produce molecules of H2O.
+///
+/// An H2O molecule needs 2 hydrogen particles and 1 particle of oxygen.
+/// - Hydrogen particles are provided by performing a write operation on ``/dev/h2o``.
+/// - Oxygen particles are provided by performing a read operation on ``/dev/h2o``.
+///
+/// Both writing and reading tasks must wait until a molecule is created to finish, but a
+/// read operation can be interrupted with the ``<Control+C>`` signal.
+///
+/// When the molecule is created, the read operation returns the concatenation of the
+/// parameters given to the write command in FIFO order.
+///
+/// Example usage:
+/// | Shell 1                   | Shell 2                   | Shell 3                   | Shell 4              |
+/// | ------------------------- | ------------------------- | ------------------------- | -------------------- |
+/// | ``$ echo abc > /dev/h2o`` |                           |                           |                      |
+/// |                           | ``$ echo def > /dev/h2o`` |                           |                      |
+/// |                           |                           | ``$ echo ghi > /dev/h2o`` |                      |
+/// |                           |                           |                           | ``$ cat < /dev/h20`` |
+/// | ``$``                     | ``$``                     |                           | ``abc``              |
+/// |                           |                           |                           | ``ghi``              |
+/// |                           | ``$ echo jkl > /dev/h2o`` |                           |                      |
+/// |                           |                           |                           |                      |
+/// | ``$ echo mno > /dev/h2o`` |                           |                           |                      |
+/// |                           |                           | ``$ echo pqr > /dev/h20`` |                      |
+/// | ``$``                     |                           | ``$``                     | ``mno``              |
+/// |                           |                           |                           | ``pqr``              |
+/// |                           |                           |                           | ``<Control+C>``      |
+/// |                           |                           |                           | ``$``                |
+///
+/// \author Ignacio Slater Muñoz
+/// \version 1.0.3.9
+/// \since 1.0
 
-/* Necessary includes for device drivers */
+#pragma region : Necessary includes for device drivers
 #include <linux/init.h>
-/* #include <linux/config.h> */
 #include <linux/module.h>
-#include <linux/kernel.h> /* printk() */
-#include <linux/slab.h>   /* kmalloc() */
-#include <linux/fs.h>     /* everything... */
-#include <linux/errno.h>  /* error codes */
-#include <linux/types.h>  /* size_t */
+#include <linux/kernel.h> // printk()
+#include <linux/slab.h>   // kmalloc()
+#include <linux/fs.h>     // everything...
+#include <linux/errno.h>  // error codes
+#include <linux/types.h>  // size_t
 #include <linux/proc_fs.h>
-#include <linux/fcntl.h>   /* O_ACCMODE */
-#include <linux/uaccess.h> /* copy_from/to_user */
+#include <linux/fcntl.h>   // O_ACCMODE
+#include <linux/uaccess.h> // copy_from/to_user
+#pragma endregion
 
 #include "kmutex.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 
-/* Declaration of h2o.c functions */
-static int h2o_open(struct inode *inode, struct file *filp);
-static int h2o_release(struct inode *inode, struct file *filp);
-static ssize_t h2o_read(struct file *filp, char *buf, size_t count, loff_t *f_pos);
-static ssize_t h2o_write(struct file *filp, const char *buf, size_t count, loff_t *f_pos);
+/// Size of the buffer to store data
+#define MAX_SIZE 8192
 
-void h2o_exit(void);
-/**
- * Registers the H2O driver and initializes it's buffer.
- */
+#pragma region : Declaration of h2o.c functions
+/// Opens the H2O module.
+/// Each time the module is opened, it's file descriptor is different.
+///
+/// \param inode
+///     a struct containing the characteristics of the file.
+/// \param pFile
+///     the file descriptor.
+/// \returns 0 if the operation was succesfull; an error code otherwise.
+static int openH2O(struct inode *inode, struct file *pFile);
+
+/// Closes the H2O module.
+/// Each time the module is opened, it's file descriptor is different.
+///
+/// \param inode
+///     a struct containing the characteristics of the file.
+/// \param pFile
+///     the file descriptor.
+///
+/// \returns 0 if the operation was succesfull; an error code otherwise.
+static int releaseH2O(struct inode *inode, struct file *pFile);
+
+/// Reads a fragment of the file.
+/// If there are bytes remaining to be read from ``pFilePos``, then the function returns
+/// ``count`` and ``pFilePos`` is moved to the first unread byte.
+///
+/// \param pFile
+///     the file descriptor.
+/// \param buf
+///     the direction where the read data should be placed.
+/// \param count
+///     the maximum number of bytes to read.
+/// \param pFilePos
+///     the position from where the bytes should be read.
+///
+/// \returns the number of bytes read, 0 if it reaches the file's end or an error code if
+///     the read operation fails.
+static ssize_t readH2O(struct file *pFile, char *buf, size_t count, loff_t *pFilePos);
+
+/// Adds a hydrogen particle to the file.
+/// If the number of bytes to be written is larger than the maximum buffer size, then only
+/// the bytes that doesn't exceed the buffer size are written to the file and an error
+/// code is returned.
+///
+/// \param pFile
+///     the file descriptor.
+/// \param buf
+///     the data to be written in the file.
+/// \param count
+///     the maximum number of bytes to write.
+/// \param pFilePos
+///     the position from where the bytes should be written.
+static ssize_t writeH2O(struct file *pFile, const char *buf, size_t count,
+                        loff_t *pFilePos);
+
+/// Unregisters the H2O driver and releases it's buffer.
+void exitH2O(void);
+
+/// Registers the H2O driver and initializes it's buffer.
 int initH2O(void);
+#pragma endregion
 
-/* Structure that declares the usual file */
-/* access functions */
+/// Structure that declares the usual file access functions.
 struct file_operations pH2OFileOperations = {
-  read : h2o_read,
-  write : h2o_write,
-  open : h2o_open,
-  release : h2o_release
+  read : readH2O,
+  write : writeH2O,
+  open : openH2O,
+  release : releaseH2O
 };
 
-/* Declaration of the init and exit functions */
-module_init(initH2O);
-module_exit(h2o_exit);
+/// Major number
+int h2oMajor = 60;
 
-/*** El driver para lecturas sincronas *************************************/
-
-/**
- * Definition for boolean values.
- */
-static typedef enum bool {
-  false,
-  true
-}
-
-/* Global variables of the driver */
-
-int h2oMajor = 60; /* Major number */
-
-/* Buffer to store data */
-#define MAX_SIZE 10
-
-static char *h2o_buffer;
+#pragma region : local variables
+static char *bufferH2O;
 static int in, out, size;
 
-/* El mutex y la condicion para h2o */
+/// H2O's mutex
 static KMutex mutex;
+/// Mutex condition
 static KCondition cond;
+static int hydrogens, oxygens;
+#pragma endregion
+
+#pragma region : Declaration of the init and exit functions
+module_init(initH2O);
+module_exit(exitH2O);
+#pragma endregion
 
 int initH2O(void)
 {
-  int rc;
+  int returnCode;
 
   /* Registering device */
-  rc = register_chrdev(h2oMajor, "h2o", &pH2OFileOperations);
-  if (rc < 0)
+  returnCode = register_chrdev(h2oMajor, "h2o", &pH2OFileOperations);
+  if (returnCode < 0)
   {
-    printk(
-        "<1>h2o: cannot obtain major number %d\n", h2oMajor);
-    return rc;
+    printk("<1>h2o: cannot obtain major number %d\n", h2oMajor);
+    return returnCode;
   }
-
+  oxygens = 0;
+  hydrogens = 0;
   in = out = size = 0;
   m_init(&mutex);
   c_init(&cond);
 
-  /* Allocating h2o_buffer */
-  h2o_buffer = kmalloc(MAX_SIZE, GFP_KERNEL);
-  if (h2o_buffer == NULL)
+  /* Allocating bufferH2O */
+  bufferH2O = kmalloc(MAX_SIZE, GFP_KERNEL);
+  if (bufferH2O == NULL)
   {
-    h2o_exit();
+    exitH2O();
     return -ENOMEM;
   }
-  memset(h2o_buffer, 0, MAX_SIZE);
+  memset(bufferH2O, 0, MAX_SIZE);
 
   printk("<1>Inserting h2o module\n");
   return 0;
 }
 
-void h2o_exit(void)
+void exitH2O(void)
 {
   /* Freeing the major number */
   unregister_chrdev(h2oMajor, "h2o");
 
   /* Freeing buffer h2o */
-  if (h2o_buffer)
+  if (bufferH2O)
   {
-    kfree(h2o_buffer);
+    kfree(bufferH2O);
   }
 
   printk("<1>Removing h2o module\n");
 }
 
-static int h2o_open(struct inode *inode, struct file *filp)
+static int openH2O(struct inode *inode, struct file *pFile)
 {
-  char *mode = filp->f_mode & FMODE_WRITE ? "write" : filp->f_mode & FMODE_READ ? "read" : "unknown";
-  printk("<1>open %p for %s\n", filp, mode);
+  char *mode = pFile->f_mode & FMODE_WRITE ? "write" : pFile->f_mode & FMODE_READ ? "read" : "unknown";
+  printk("<1>open %p for %s\n", pFile, mode);
   return 0;
 }
 
-static int h2o_release(struct inode *inode, struct file *filp)
+static int releaseH2O(struct inode *inode, struct file *pFile)
 {
-  printk("<1>release %p\n", filp);
+  printk("<1>release %p\n", pFile);
   return 0;
 }
 
-static ssize_t h2o_read(struct file *filp, char *buf,
-                        size_t ucount, loff_t *f_pos)
+static ssize_t readH2O(struct file *pFile, char *buf,
+                       size_t ucount, loff_t *pFilePos)
 {
+  int k;
   ssize_t count = ucount;
 
-  printk("<1>read %p %ld\n", filp, count);
+  printk("<1>read %p %ld\n", pFile, count);
   m_lock(&mutex);
 
-  while (size == 0)
+  oxygens++;
+  while (hydrogens < 2)
   {
-    /* si no hay nada en el buffer, el lector espera */
+    // The procedure waits if there's not enough hydrogens
     if (c_wait(&cond, &mutex))
     {
       printk("<1>read interrupted\n");
@@ -183,17 +226,16 @@ static ssize_t h2o_read(struct file *filp, char *buf,
   }
 
   /* Transfiriendo datos hacia el espacio del usuario */
-  int k;
   for (k = 0; k < count; k++)
   {
-    if (copy_to_user(buf + k, h2o_buffer + out, 1) != 0)
+    if (copy_to_user(buf + k, bufferH2O + out, 1) != 0)
     {
       /* el valor de buf es una direccion invalida */
       count = -EFAULT;
       goto epilog;
     }
     printk("<1>read byte %c (%d) from %d\n",
-           h2o_buffer[out], h2o_buffer[out], out);
+           bufferH2O[out], bufferH2O[out], out);
     out = (out + 1) % MAX_SIZE;
     size--;
   }
@@ -204,41 +246,44 @@ epilog:
   return count;
 }
 
-static ssize_t h2o_write(struct file *filp, const char *buf,
-                         size_t ucount, loff_t *f_pos)
+static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
+                        loff_t *pFilePos)
 {
+  int k;
   ssize_t count = ucount;
 
-  printk("<1>write %p %ld\n", filp, count);
+  printk("<1>write %p %ld\n", pFile, count);
   m_lock(&mutex);
-  int k;
-  for (k = 0; k < count; k++)
+  try:
   {
-    while (size == MAX_SIZE)
+    for (k = 0; k < count; k++)
     {
-      /* si el buffer esta lleno, el escritor espera */
+      if (copy_from_user(bufferH2O + in, buf + k, 1) != 0)
+      {
+        // The buffer's adress is invalid
+        count = -EFAULT;
+        goto finally;
+      }
+      printk("<1>write byte %c (%d) at %d\n", bufferH2O[in], bufferH2O[in], in);
+      in = (in + 1) % MAX_SIZE;
+      size++;
+    }
+    hydrogens++;
+    while (oxygens < 1)
+    {
+      // The process waits if there's not enough oxygens to form a molecule
       if (c_wait(&cond, &mutex))
       {
         printk("<1>write interrupted\n");
         count = -EINTR;
-        goto epilog;
+        goto finally;
       }
+      c_broadcast(&cond);
     }
-
-    if (copy_from_user(h2o_buffer + in, buf + k, 1) != 0)
-    {
-      /* el valor de buf es una direccion invalida */
-      count = -EFAULT;
-      goto epilog;
-    }
-    printk("<1>write byte %c (%d) at %d\n",
-           h2o_buffer[in], h2o_buffer[in], in);
-    in = (in + 1) % MAX_SIZE;
-    size++;
-    c_broadcast(&cond);
   }
-
-epilog:
-  m_unlock(&mutex);
-  return count;
+  finally:
+  {
+    m_unlock(&mutex);
+    return count;
+  }
 }
