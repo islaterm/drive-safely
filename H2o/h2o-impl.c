@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.5.4
+/// \version 1.0.5.5
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -242,7 +242,6 @@ static ssize_t readH2O(struct file *pFile, char *buf,
            bufferH2O[out], bufferH2O[out], out);
     out = (out + 1) % MAX_SIZE;
     size--;
-    c_broadcast(&cond);
   }
 
 epilog:
@@ -266,7 +265,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     printk("DEBUG:  There are %d hydrogens %s\n", hydrogens, buf);
     while (hydrogens > 2)
     {
-      printk("DEBUG:  Going to sleep %s\n", buf);
+      printk("DEBUG:  Too much hydrogen. Going to sleep %s\n", buf);
       // The process waits if there's already two hydrogens
       if (c_wait(&cond, &mutex))
       {
@@ -291,7 +290,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     }
     while (oxygens < 1)
     {
-      printk("DEBUG:  Waiting for oxygens %s\n", buf);
+      printk("DEBUG:  Waiting for oxygens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
       if (c_wait(&cond, &mutex))
       {
@@ -299,6 +298,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
         count = -EINTR;
         goto finally;
       }
+      printk("DEBUG:  I'm awake %s\n", buf);
     }
   }
   count = 0;
