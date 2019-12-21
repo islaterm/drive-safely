@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.4.3
+/// \version 1.0.5.1
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -294,6 +294,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       }
     }
   }
+  count = 0;
   finally:
   {
     hydrogens--;
@@ -301,6 +302,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     printk("DEBUG:  Broadcasting from write\n");
     c_broadcast(&cond);
     m_unlock(&mutex);
+    printk("DEBUG:  Returning.\n");
     return count;
   }
 }
