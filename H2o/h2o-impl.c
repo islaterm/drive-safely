@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.5.3
+/// \version 1.0.5.4
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -188,7 +188,11 @@ void exitH2O(void)
 
 static int openH2O(struct inode *inode, struct file *pFile)
 {
-  char *mode = pFile->f_mode & FMODE_WRITE ? "write" : pFile->f_mode & FMODE_READ ? "read" : "unknown";
+  char *mode = pFile->f_mode & FMODE_WRITE
+                   ? "write"
+                   : pFile->f_mode & FMODE_READ
+                         ? "read"
+                         : "unknown";
   printk("<1>open %p for %s\n", pFile, mode);
   return 0;
 }
@@ -238,6 +242,7 @@ static ssize_t readH2O(struct file *pFile, char *buf,
            bufferH2O[out], bufferH2O[out], out);
     out = (out + 1) % MAX_SIZE;
     size--;
+    c_broadcast(&cond);
   }
 
 epilog:
