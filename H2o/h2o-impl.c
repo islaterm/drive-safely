@@ -31,7 +31,7 @@
  * |                           |                           |                           | ``$``                |
  *
  * @author Ignacio Slater Muñoz
- * @version 1.0.3.4
+ * @version 1.0.3.5
  * @since 1.0
  */
 
@@ -51,6 +51,9 @@
 #include "kmutex.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
+
+/* Buffer to store data */
+#define MAX_SIZE 10
 
 /* Declaration of h2o.c functions */
 static int h2o_open(struct inode *inode, struct file *filp);
@@ -77,22 +80,10 @@ struct file_operations pH2OFileOperations = {
 module_init(initH2O);
 module_exit(h2o_exit);
 
-/*** El driver para lecturas sincronas *************************************/
-
-/**
- * Definition for boolean values.
- */
-typedef enum bool {
-  false,
-  true
-}
-
 /* Global variables of the driver */
+/* Major number */
+int h2oMajor = 60; 
 
-int h2oMajor = 60; /* Major number */
-
-/* Buffer to store data */
-#define MAX_SIZE 10
 
 static char *h2o_buffer;
 static int in, out, size;
