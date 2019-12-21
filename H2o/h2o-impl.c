@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.4.2
+/// \version 1.0.4.3
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -258,7 +258,8 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   hydrogens++;
   try:
   {
-    while (hydrogens >= 2)
+    printk("DEBUG:  There are %d hydrogens\n", hydrogens);
+    while (hydrogens > 2)
     {
       // The process waits if there's already two hydrogens
       if (c_wait(&cond, &mutex))
@@ -283,6 +284,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     }
     while (oxygens < 1)
     {
+      printk("DEBUG:  Waiting for oxygens\n");
       // The process waits if there's not enough oxygens to form a molecule
       if (c_wait(&cond, &mutex))
       {
@@ -295,6 +297,8 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   finally:
   {
     hydrogens--;
+    printk("DEBUG:  There are %d hydrogens\n", hydrogens);
+    printk("DEBUG:  Broadcasting from write\n");
     c_broadcast(&cond);
     m_unlock(&mutex);
     return count;
