@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.3.8
+/// \version 1.0.3.9
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -208,9 +208,9 @@ static ssize_t readH2O(struct file *pFile, char *buf,
   printk("<1>read %p %ld\n", pFile, count);
   m_lock(&mutex);
 
-  while (size == 0)
+  while (hydrogens < 2)
   {
-    /* si no hay nada en el buffer, el lector espera */
+    // The procedure waits if there's not enough hydrogens
     if (c_wait(&cond, &mutex))
     {
       printk("<1>read interrupted\n");
