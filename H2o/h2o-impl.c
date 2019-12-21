@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.5.1
+/// \version 1.0.5.2
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -241,8 +241,8 @@ static ssize_t readH2O(struct file *pFile, char *buf,
   }
 
 epilog:
-  oxygens--;
   c_broadcast(&cond);
+  oxygens--;
   m_unlock(&mutex);
   return count;
 }
@@ -297,10 +297,10 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   count = 0;
   finally:
   {
-    hydrogens--;
-    printk("DEBUG:  There are %d hydrogens\n", hydrogens);
     printk("DEBUG:  Broadcasting from write\n");
     c_broadcast(&cond);
+    hydrogens--;
+    printk("DEBUG:  There are %d hydrogens\n", hydrogens);
     m_unlock(&mutex);
     printk("DEBUG:  Returning.\n");
     return count;
