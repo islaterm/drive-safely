@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.3.9
+/// \version 1.0.4.1
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -254,21 +254,32 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
 
   printk("<1>write %p %ld\n", pFile, count);
   m_lock(&mutex);
+  hydrogens++;
   try:
   {
-    for (k = 0; k < count; k++)
+    while (hydrogens >= 2)
     {
-      if (copy_from_user(bufferH2O + in, buf + k, 1) != 0)
+      // The process waits if there's already two hydrogens
+      if (c_wait(&cond, &mutex))
       {
-        // The buffer's adress is invalid
-        count = -EFAULT;
+        printk("<1>write interrupted\n");
+        count = -EINTR;
         goto finally;
       }
-      printk("<1>write byte %c (%d) at %d\n", bufferH2O[in], bufferH2O[in], in);
-      in = (in + 1) % MAX_SIZE;
-      size++;
+      // The oxygen is added to the module
+      for (k = 0; k < count; k++)
+      {
+        if (copy_from_user(bufferH2O + in, buf + k, 1) != 0)
+        {
+          // The buffer's adress is invalid
+          count = -EFAULT;
+          goto finally;
+        }
+        printk("<1>write byte %c (%d) at %d\n", bufferH2O[in], bufferH2O[in], in);
+        in = (in + 1) % MAX_SIZE;
+        size++;
+      }
     }
-    hydrogens++;
     while (oxygens < 1)
     {
       // The process waits if there's not enough oxygens to form a molecule
@@ -278,11 +289,11 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
         count = -EINTR;
         goto finally;
       }
-      c_broadcast(&cond);
     }
   }
   finally:
   {
+    c_broadcast(&cond);
     m_unlock(&mutex);
     return count;
   }
