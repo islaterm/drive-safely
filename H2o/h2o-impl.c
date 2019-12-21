@@ -31,7 +31,7 @@
  * |                           |                           |                           | ``$``                |
  *
  * @author Ignacio Slater Muñoz
- * @version 1.0.3.1
+ * @version 1.0.3.2
  * @since 1.0
  */
 
@@ -82,7 +82,7 @@ module_exit(h2o_exit);
 /**
  * Definition for boolean values.
  */
-static typedef enum bool {
+typedef enum bool {
   false,
   true
 }
