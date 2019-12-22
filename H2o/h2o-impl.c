@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.6.4
+/// \version 1.0.7.1
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -251,6 +251,7 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   }
 
 epilog:
+  oxygens--;
   c_broadcast(&cond);
   printk("DEBUG:readH2O:  Broadcasting %s\n", oxygens, buf);
   m_unlock(&mutex);
