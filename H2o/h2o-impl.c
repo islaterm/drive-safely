@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.1
+/// \version 1.0.9.2
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -48,6 +48,7 @@
 
 #include "kmutex.h"
 
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-label"
 
