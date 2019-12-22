@@ -54,7 +54,7 @@ static int in, out, size;
 
 /* El mutex y la condicion para pipe */
 static KMutex mutex;
-static KCondition enoughOxygenCondition;
+static KCondition cond;
 
 int pipe_init(void) {
   int rc;
@@ -69,7 +69,7 @@ int pipe_init(void) {
 
   in= out= size= 0;
   m_init(&mutex);
-  c_init(&enoughOxygenCondition);
+  c_init(&cond);
 
   /* Allocating pipe_buffer */
   pipe_buffer = kmalloc(MAX_SIZE, GFP_KERNEL);
@@ -117,7 +117,7 @@ static ssize_t pipe_read(struct file *filp, char *buf,
 
   while (size==0) {
     /* si no hay nada en el buffer, el lector espera */
-    if (c_wait(&enoughOxygenCondition, &mutex)) {
+    if (c_wait(&cond, &mutex)) {
       printk("<1>read interrupted\n");
       count= -EINTR;
       goto epilog;
@@ -142,7 +142,7 @@ static ssize_t pipe_read(struct file *filp, char *buf,
   }
 
 epilog:
-  c_broadcast(&enoughOxygenCondition);
+  c_broadcast(&cond);
   m_unlock(&mutex);
   return count;
 }
@@ -157,7 +157,7 @@ static ssize_t pipe_write( struct file *filp, const char *buf,
   for (int k= 0; k<count; k++) {
     while (size==MAX_SIZE) {
       /* si el buffer esta lleno, el escritor espera */
-      if (c_wait(&enoughOxygenCondition, &mutex)) {
+      if (c_wait(&cond, &mutex)) {
         printk("<1>write interrupted\n");
         count= -EINTR;
         goto epilog;
@@ -173,7 +173,7 @@ static ssize_t pipe_write( struct file *filp, const char *buf,
            pipe_buffer[in], pipe_buffer[in], in);
     in= (in+1)%MAX_SIZE;
     size++;
-    c_broadcast(&enoughOxygenCondition);
+    c_broadcast(&cond);
   }
 
 epilog:

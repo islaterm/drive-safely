@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.5.9
+/// \version 1.0.3.9
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -261,23 +261,8 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
 
   printk("<1>write %p %ld\n", pFile, count);
   m_lock(&mutex);
-  hydrogens++;
   try:
   {
-    printk("DEBUG:  There are %d hydrogens %s\n", hydrogens, buf);
-    while (hydrogens > 2)
-    {
-      printk("DEBUG:  Too much hydrogen. Going to sleep %s\n", buf);
-      // The process waits if there's already two hydrogens
-      if (c_wait(&waitHydrogenCond, &mutex))
-      {
-        printk("<1>write interrupted\n");
-        count = -EINTR;
-        goto finally;
-      }
-      printk("DEBUG:  I'm awake %s", buf);
-    }
-    // The oxygen is added to the module
     for (k = 0; k < count; k++)
     {
       if (copy_from_user(bufferH2O + in, buf + k, 1) != 0)
@@ -290,7 +275,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       in = (in + 1) % MAX_SIZE;
       size++;
     }
-    c_broadcast(&waitHydrogenCond);
+    hydrogens++;
     while (oxygens < 1)
     {
       printk("DEBUG:  Waiting for oxygens. Going to sleep %s\n", buf);
@@ -300,10 +285,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
         printk("<1>write interrupted\n");
         count = -EINTR;
         goto finally;
-      }
-      printk("DEBUG:  I'm awake %s\n", buf);
       printk("DEBUG:  There's %d oxygens %s\n", oxygens, buf);
-    }
   }
   count = 0;
 finally:

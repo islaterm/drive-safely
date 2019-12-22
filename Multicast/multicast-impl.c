@@ -48,7 +48,7 @@ static size_t curr_pos;
 
 /* El mutex y la condicion para multicast */
 static KMutex mutex;
-static KCondition enoughOxygenCondition;
+static KCondition cond;
 
 int multicast_init(void) {
   int rc;
@@ -71,7 +71,7 @@ int multicast_init(void) {
   curr_size= 0;
   curr_pos= 0;
   m_init(&mutex);
-  c_init(&enoughOxygenCondition);
+  c_init(&cond);
 
   printk("<1>Inserting multicast module\n"); 
   return 0;
@@ -107,7 +107,7 @@ static ssize_t multicast_read(struct file *filp, char *buf,
                     size_t count, loff_t *f_pos) { 
   ssize_t rc= 0;
   m_lock(&mutex); 
-  if (c_wait(&enoughOxygenCondition, &mutex)) {
+  if (c_wait(&cond, &mutex)) {
     printk("<1>read interrupted while waiting for data\n");
     rc= -EINTR;
     goto epilog;
@@ -151,7 +151,7 @@ static ssize_t multicast_write( struct file *filp, const char *buf,
   curr_size = count;
   curr_pos += count;
   *f_pos= curr_pos;
-  c_broadcast(&enoughOxygenCondition);
+  c_broadcast(&cond);
   rc= count;
 
 epilog:

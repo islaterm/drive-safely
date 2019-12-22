@@ -56,7 +56,7 @@ static int pend_open_write;
 
 /* El mutex y la condicion para syncread */
 static KMutex mutex;
-static KCondition enoughOxygenCondition;
+static KCondition cond;
 
 int syncread_init(void)
 {
@@ -76,7 +76,7 @@ int syncread_init(void)
   pend_open_write = 0;
   curr_size = 0;
   m_init(&mutex);
-  c_init(&enoughOxygenCondition);
+  c_init(&cond);
 
   /* Allocating syncread_buffer */
   syncread_buffer = kmalloc(MAX_SIZE, GFP_KERNEL);
@@ -118,10 +118,10 @@ int syncread_open(struct inode *inode, struct file *filp)
     pend_open_write++;
     while (writing || readers > 0)
     {
-      if (c_wait(&enoughOxygenCondition, &mutex))
+      if (c_wait(&cond, &mutex))
       {
         pend_open_write--;
-        c_broadcast(&enoughOxygenCondition);
+        c_broadcast(&cond);
         rc = -EINTR;
         goto epilog;
       }
@@ -129,7 +129,7 @@ int syncread_open(struct inode *inode, struct file *filp)
     writing = TRUE;
     pend_open_write--;
     curr_size = 0;
-    c_broadcast(&enoughOxygenCondition);
+    c_broadcast(&cond);
     printk("<1>open for write successful\n");
   }
   else if (filp->f_mode & FMODE_READ)
@@ -141,7 +141,7 @@ int syncread_open(struct inode *inode, struct file *filp)
      */
     while (!writing && pend_open_write > 0)
     {
-      if (c_wait(&enoughOxygenCondition, &mutex))
+      if (c_wait(&cond, &mutex))
       {
         rc = -EINTR;
         goto epilog;
@@ -163,14 +163,14 @@ int syncread_release(struct inode *inode, struct file *filp)
   if (filp->f_mode & FMODE_WRITE)
   {
     writing = FALSE;
-    c_broadcast(&enoughOxygenCondition);
+    c_broadcast(&cond);
     printk("<1>close for write successful\n");
   }
   else if (filp->f_mode & FMODE_READ)
   {
     readers--;
     if (readers == 0)
-      c_broadcast(&enoughOxygenCondition);
+      c_broadcast(&cond);
     printk("<1>close for read (readers remaining=%d)\n", readers);
   }
 
@@ -189,7 +189,7 @@ ssize_t syncread_read(struct file *filp, char *buf,
     /* si el lector esta en el final del archivo pero hay un proceso
      * escribiendo todavia en el archivo, el lector espera.
      */
-    if (c_wait(&enoughOxygenCondition, &mutex))
+    if (c_wait(&cond, &mutex))
     {
       printk("<1>read interrupted\n");
       rc = -EINTR;
@@ -246,7 +246,7 @@ ssize_t syncread_write(struct file *filp, const char *buf,
   *f_pos += count;
   curr_size = *f_pos;
   rc = count;
-  c_broadcast(&enoughOxygenCondition);
+  c_broadcast(&cond);
 
 epilog:
   m_unlock(&mutex);
