@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.6.4
+/// \version 1.0.8.1
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
