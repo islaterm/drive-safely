@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.6.1
+/// \version 1.0.6.2
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -132,8 +132,8 @@ static int in, out, size;
 
 /// H2O's mutex
 static KMutex mutex;
-/// Mutex condition
-static KCondition cond;
+/// Mutex conditions
+static KCondition cond, releasedHydrogen;
 static int hydrogens, oxygens;
 #pragma endregion
 
@@ -158,6 +158,7 @@ int initH2O(void)
   in = out = size = 0;
   m_init(&mutex);
   c_init(&cond);
+  c_init(&releasedHydrogen);
 
   /* Allocating bufferH2O */
   bufferH2O = kmalloc(MAX_SIZE, GFP_KERNEL);
@@ -262,6 +263,19 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   printk("DEBUG:writeH2O: lock (((aquired))) %s\n", buf);
   try:
   {
+    while (hydrogens >= 2)
+    {
+      printk("DEBUG:writeH2O: Too much hydrogen. Going to sleep %s\n", buf);
+      // The process waits if there's not enough oxygens to form a molecule
+      if (c_wait(&releasedHydrogen, &mutex))
+      {
+        printk("<1>write interrupted\n");
+        count = -EINTR;
+        goto finally;
+      }
+      printk("DEBUG:writeH2O: I'm awake %s\n", buf);
+    }
+    
     for (k = 0; k < count; k++)
     {
       if (copy_from_user(bufferH2O + in, buf + k, 1) != 0)
@@ -290,6 +304,8 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       c_broadcast(&cond);
       printk("DEBUG:writeH2O: Broadcasting %s\n", buf);
     }
+    hydrogens--;
+    c_broadcast(&releasedHydrogen);
   }
   finally:
   {
