@@ -30,8 +30,11 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.2
+/// \version 1.0.9.3
 /// \since 1.0
+
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wunused-label"
 
 #pragma region : Necessary includes for device drivers
 #include <linux/init.h>
@@ -47,10 +50,6 @@
 #pragma endregion
 
 #include "kmutex.h"
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#pragma GCC diagnostic ignored "-Wunused-label"
 
 MODULE_LICENSE("Dual BSD/GPL");
 
