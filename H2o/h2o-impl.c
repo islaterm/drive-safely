@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.3
+/// \version 1.0.9.5
 /// \since 1.0
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -54,7 +54,7 @@
 MODULE_LICENSE("Dual BSD/GPL");
 #pragma region : macros
 /// Raises an exception
-#define throw()(goto finally)
+#define throw() goto finally
 
 /// Size of the buffer to store data
 #define MAX_SIZE 8192
