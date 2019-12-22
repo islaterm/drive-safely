@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.8.3
+/// \version 1.0.8.4
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -214,21 +214,21 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
 
   printk("<1>read %p %ld\n", pFile, count);
   m_lock(&mutex);
-  printk("DEBUG:readH2O:  lock (((aquired))) %s\n", buf);
+  printk("DEBUG:readH2O:  lock (((aquired))) %s\n", bufferH2O);
 
   oxygens++;
-  printk("DEBUG:readH2O:  there's %d oxygens %s\n", oxygens, buf);
+  printk("DEBUG:readH2O:  there's %d oxygens %s\n", oxygens, bufferH2O);
   while (hydrogens < 2)
   {
-    printk("DEBUG:readH2O:  Not enough hydrogens. Going to sleep %s\n", oxygens, buf);
+    printk("DEBUG:readH2O:  Not enough hydrogens. Going to sleep %s\n", oxygens, bufferH2O);
     // The procedure waits if there's not enough hydrogens
-    if (c_wait(&cond, &mutex))
+    if (c_wait(&waitingHydrogen, &mutex))
     {
       printk("<1>read interrupted\n");
       count = -EINTR;
       goto epilog;
     }
-    printk("DEBUG:readH2O:  I'm awake %s\n", oxygens, buf);
+    printk("DEBUG:readH2O:  I'm awake %s\n", oxygens, bufferH2O);
   }
 
   if (count > size)
@@ -253,9 +253,9 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
 
 epilog:
   c_broadcast(&cond);
-  printk("DEBUG:readH2O:  Broadcasting %s\n", oxygens, buf);
+  printk("DEBUG:readH2O:  Broadcasting %s\n", oxygens, bufferH2O);
   m_unlock(&mutex);
-  printk("DEBUG:readH2O:  (((Unlocked))) %s\n", oxygens, buf);
+  printk("DEBUG:readH2O:  (((Unlocked))) %s\n", oxygens, bufferH2O);
   return count;
 }
 
@@ -309,7 +309,6 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
         goto finally;
       }
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
-      c_broadcast(&cond);
     }
     while (oxygens < 1)
     {
