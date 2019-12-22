@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.12
+/// \version 1.0.9.13
 /// \since 1.0
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -331,14 +331,13 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
       c_broadcast(&cond);
     }
-    if (++removedHydrogens == 2)
+    hydrogens--;
+    if (hydrogens == 0)
     {
       printk("DEBUG:writeH2O: Removing  %s\n", buf);
       oxygens--;
       c_broadcast(&waitingMolecule);
-      removedHydrogens = 0;
     }
-    hydrogens--;
   }
   finally:
   {
