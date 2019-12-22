@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.5.9
+/// \version 1.0.5.10
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -212,43 +212,44 @@ static ssize_t readH2O(struct file *pFile, char *buf,
 
   printk("<1>read %p %ld\n", pFile, count);
   m_lock(&mutex);
-
-  oxygens++;
-  c_broadcast(&waitOxygenCond);
-  while (hydrogens < 2)
+  while (true)
   {
-    // The procedure waits if there's not enough hydrogens
-    if (c_wait(&waitHydrogenCond, &mutex))
+    oxygens++;
+    c_broadcast(&waitOxygenCond);
+    while (hydrogens < 2)
     {
-      printk("<1>read interrupted\n");
-      count = -EINTR;
-      goto epilog;
+      // The procedure waits if there's not enough hydrogens
+      if (c_wait(&waitHydrogenCond, &mutex))
+      {
+        printk("<1>read interrupted\n");
+        count = -EINTR;
+        goto epilog;
+      }
     }
-  }
 
-  if (count > size)
-  {
-    count = size;
-  }
-
-  /* Transfiriendo datos hacia el espacio del usuario */
-  for (k = 0; k < count; k++)
-  {
-    if (copy_to_user(buf + k, bufferH2O + out, 1) != 0)
+    if (count > size)
     {
-      /* el valor de buf es una direccion invalida */
-      count = -EFAULT;
-      goto epilog;
+      count = size;
     }
-    printk("<1>read byte %c (%d) from %d\n",
-           bufferH2O[out], bufferH2O[out], out);
-    out = (out + 1) % MAX_SIZE;
-    size--;
-  }
 
+    /* Transfiriendo datos hacia el espacio del usuario */
+    for (k = 0; k < count; k++)
+    {
+      if (copy_to_user(buf + k, bufferH2O + out, 1) != 0)
+      {
+        /* el valor de buf es una direccion invalida */
+        count = -EFAULT;
+        goto epilog;
+      }
+      printk("<1>read byte %c (%d) from %d\n",
+             bufferH2O[out], bufferH2O[out], out);
+      out = (out + 1) % MAX_SIZE;
+      size--;
+    }
+    oxygens--;
+    printk("DEBUG:  There are %d oxygens.\n", oxygens);
+  }
 epilog:
-  oxygens--;
-  printk("DEBUG:  There are %d oxygens.\n", oxygens);
   m_unlock(&mutex);
   return count;
 }
