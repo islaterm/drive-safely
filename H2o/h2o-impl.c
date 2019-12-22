@@ -30,13 +30,16 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.18
+/// \version 1.0.9.19
 /// \since 1.0
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-attributes"
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-label"
 
 #pragma region : Necessary includes for device drivers
+
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h> // printk()
@@ -47,6 +50,7 @@
 #include <linux/proc_fs.h>
 #include <linux/fcntl.h>   // O_ACCMODE
 #include <linux/uaccess.h> // copy_from/to_user
+
 #pragma endregion
 
 #include "kmutex.h"
@@ -58,6 +62,7 @@ MODULE_LICENSE("Dual BSD/GPL");
 #pragma endregion
 
 #pragma region : Declaration of h2o.c functions
+
 /// Opens the H2O module.
 /// Each time the module is opened, it's file descriptor is different.
 ///
@@ -117,14 +122,15 @@ void exitH2O(void);
 
 /// Registers the H2O driver and initializes it's buffer.
 int initH2O(void);
+
 #pragma endregion
 
 /// Structure that declares the usual file access functions.
 struct file_operations pH2OFileOperations = {
-        read : readH2O,
-        write : writeH2O,
-        open : openH2O,
-        release : releaseH2O
+    .read =  readH2O,
+    .write =  writeH2O,
+    .open =  openH2O,
+    .release =  releaseH2O
 };
 
 /// Major number
@@ -146,14 +152,12 @@ module_init(initH2O);
 module_exit(exitH2O);
 #pragma endregion
 
-int initH2O(void)
-{
+int initH2O(void) {
   int returnCode;
 
   /* Registering device */
   returnCode = register_chrdev(h2oMajor, "h2o", &pH2OFileOperations);
-  if (returnCode < 0)
-  {
+  if (returnCode < 0) {
     printk("<1>h2o: cannot obtain major number %d\n", h2oMajor);
     return returnCode;
   }
@@ -168,8 +172,7 @@ int initH2O(void)
 
   /* Allocating bufferH2O */
   bufferH2O = kmalloc(MAX_SIZE, GFP_KERNEL);
-  if (bufferH2O == NULL)
-  {
+  if (bufferH2O == NULL) {
     exitH2O();
     return -ENOMEM;
   }
@@ -179,39 +182,37 @@ int initH2O(void)
   return 0;
 }
 
-void exitH2O(void)
-{
+void exitH2O(void) {
   /* Freeing the major number */
   unregister_chrdev(h2oMajor, "h2o");
 
   /* Freeing buffer h2o */
-  if (bufferH2O)
-  {
+  if (bufferH2O) {
     kfree(bufferH2O);
   }
 
   printk("<1>Removing h2o module\n");
 }
 
-static int openH2O(struct inode *inode, struct file *pFile)
-{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+
+static int openH2O(struct inode *inode, struct file *pFile) {
   char *mode = pFile->f_mode & FMODE_WRITE
-                   ? "write"
-                   : pFile->f_mode & FMODE_READ
-                         ? "read"
-                         : "unknown";
+               ? "write"
+               : pFile->f_mode & FMODE_READ
+                 ? "read"
+                 : "unknown";
   printk("<1>open %p for %s\n", pFile, mode);
   return 0;
 }
 
-static int releaseH2O(struct inode *inode, struct file *pFile)
-{
+static int releaseH2O(struct inode *inode, struct file *pFile) {
   printk("<1>release %p\n", pFile);
   return 0;
 }
 
-static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFilePos)
-{
+static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFilePos) {
   int k;
   ssize_t count = ucount;
 
@@ -223,12 +224,10 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   printk("DEBUG:readH2O:  there's %d oxygens %s\n", oxygens, bufferH2O);
   try:
   {
-    while (hydrogens < 2)
-    {
+    while (hydrogens < 2) {
       printk("DEBUG:readH2O:  Not enough hydrogens. Going to sleep %s\n", bufferH2O);
       // The procedure waits if there's not enough hydrogens
-      if (c_wait(&waitingHydrogen, &mutex))
-      {
+      if (c_wait(&waitingHydrogen, &mutex)) {
         printk("<1>read interrupted\n");
         count = -EINTR;
         goto finally;
@@ -236,16 +235,13 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
       printk("DEBUG:readH2O:  I'm awake %s\n", bufferH2O);
     }
 
-    if (count > size)
-    {
+    if (count > size) {
       count = size;
     }
 
     /* Transfiriendo datos hacia el espacio del usuario */
-    for (k = 0; k < count; k++)
-    {
-      if (copy_to_user(buf + k, bufferH2O + out, 1) != 0)
-      {
+    for (k = 0; k < count; k++) {
+      if (copy_to_user(buf + k, bufferH2O + out, 1) != 0) {
         /* el valor de buf es una direccion invalida */
         count = -EFAULT;
         goto finally;
@@ -268,8 +264,7 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
 }
 
 static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
-                        loff_t *pFilePos)
-{
+                        loff_t *pFilePos) {
   int k;
   ssize_t count = ucount;
 
@@ -278,12 +273,10 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   printk("DEBUG:writeH2O: lock (((aquired))) %s\n", buf);
   try:
   {
-    while (hydrogens >= 2)
-    {
+    while (hydrogens >= 2) {
       printk("DEBUG:writeH2O: Too much hydrogen. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
-      if (c_wait(&waitingMolecule, &mutex))
-      {
+      if (c_wait(&waitingMolecule, &mutex)) {
         printk("<1>write interrupted\n");
         count = -EINTR;
         goto finally;
@@ -291,10 +284,8 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
     }
 
-    for (k = 0; k < count; k++)
-    {
-      if (copy_from_user(bufferH2O + in, buf + k, 1) != 0)
-      {
+    for (k = 0; k < count; k++) {
+      if (copy_from_user(bufferH2O + in, buf + k, 1) != 0) {
         // The buffer's adress is invalid
         count = -EFAULT;
         goto finally;
@@ -306,24 +297,20 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     hydrogens++;
     c_broadcast(&waitingHydrogen);
     printk("DEBUG:writeH2O: There's %d hydrogens %s\n", hydrogens, buf);
-    while (hydrogens < 2)
-    {
+    while (hydrogens < 2) {
       printk("DEBUG:writeH2O: Not enough hydrogens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
-      if (c_wait(&waitingHydrogen, &mutex))
-      {
+      if (c_wait(&waitingHydrogen, &mutex)) {
         printk("<1>write interrupted\n");
         count = -EINTR;
         goto finally;
       }
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
     }
-    while (oxygens < 1)
-    {
+    while (oxygens < 1) {
       printk("DEBUG:writeH2O: Not enough oxygens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
-      if (c_wait(&cond, &mutex))
-      {
+      if (c_wait(&cond, &mutex)) {
         printk("<1>write interrupted\n");
         count = -EINTR;
         goto finally;
@@ -332,8 +319,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       c_broadcast(&cond);
     }
     hydrogens--;
-    if (hydrogens == 0)
-    {
+    if (hydrogens == 0) {
       printk("DEBUG:writeH2O: Removing  %s\n", buf);
       oxygens--;
       c_broadcast(&waitingMolecule);
@@ -346,3 +332,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     return count;
   }
 }
+
+#pragma clang diagnostic pop
+
+#pragma clang diagnostic pop
