@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.7.2
+/// \version 1.0.7.3
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -161,6 +161,7 @@ int initH2O(void)
   m_init(&mutex);
   c_init(&cond);
   c_init(&releasedHydrogen);
+  c_init(&waitingHydrogen);
 
   /* Allocating bufferH2O */
   bufferH2O = kmalloc(MAX_SIZE, GFP_KERNEL);
