@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.9
+/// \version 1.0.9.10
 /// \since 1.0
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -317,7 +317,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       }
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
     }
-    while (oxygens < 1 && hydrogens < 2)
+    while (oxygens < 1)
     {
       printk("DEBUG:writeH2O: Not enough oxygens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
@@ -331,12 +331,11 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       c_broadcast(&cond);
     }
     hydrogens--;
-    if (oxygens > 0)
+    if (hydrogens > 0 && oxygens > 0)
     {
       oxygens--;
+      c_broadcast(&waitingMolecule);
     }
-    
-    c_broadcast(&waitingMolecule);
   }
   finally:
   {
