@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.5.6
+/// \version 1.0.5.7
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -133,7 +133,7 @@ static int in, out, size;
 /// H2O's mutex
 static KMutex mutex;
 /// Mutex condition
-static KCondition cond;
+static KCondition waitOxygenCond, waitHydrogenCond;
 static int hydrogens, oxygens;
 #pragma endregion
 
@@ -157,7 +157,8 @@ int initH2O(void)
   hydrogens = 0;
   in = out = size = 0;
   m_init(&mutex);
-  c_init(&cond);
+  c_init(&waitOxygenCond);
+  c_init(&waitHydrogenCond);
 
   /* Allocating bufferH2O */
   bufferH2O = kmalloc(MAX_SIZE, GFP_KERNEL);
@@ -213,10 +214,11 @@ static ssize_t readH2O(struct file *pFile, char *buf,
   m_lock(&mutex);
 
   oxygens++;
+  c_broadcast(&waitOxygenCond);
   while (hydrogens < 2)
   {
     // The procedure waits if there's not enough hydrogens
-    if (c_wait(&cond, &mutex))
+    if (c_wait(&waitHydrogenCond, &mutex))
     {
       printk("<1>read interrupted\n");
       count = -EINTR;
@@ -245,9 +247,7 @@ static ssize_t readH2O(struct file *pFile, char *buf,
   }
 
 epilog:
-  c_broadcast(&cond);
   oxygens--;
-  hydrogens -= 2;
   m_unlock(&mutex);
   return count;
 }
@@ -268,7 +268,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     {
       printk("DEBUG:  Too much hydrogen. Going to sleep %s\n", buf);
       // The process waits if there's already two hydrogens
-      if (c_wait(&cond, &mutex))
+      if (c_wait(&waitHydrogenCond, &mutex))
       {
         printk("<1>write interrupted\n");
         count = -EINTR;
@@ -289,11 +289,12 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       in = (in + 1) % MAX_SIZE;
       size++;
     }
+    c_broadcast(&waitHydrogenCond);
     while (oxygens < 1)
     {
       printk("DEBUG:  Waiting for oxygens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
-      if (c_wait(&cond, &mutex))
+      if (c_wait(&waitOxygenCond, &mutex))
       {
         printk("<1>write interrupted\n");
         count = -EINTR;
@@ -305,7 +306,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   count = 0;
 finally:
   printk("DEBUG:  Broadcasting %s\n", buf);
-  c_broadcast(&cond);
+  c_broadcast(&waitHydrogenCond);
   m_unlock(&mutex);
   printk("DEBUG:  Returning.\n");
   return count;
