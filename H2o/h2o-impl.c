@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.5.7
+/// \version 1.0.5.8
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -248,6 +248,7 @@ static ssize_t readH2O(struct file *pFile, char *buf,
 
 epilog:
   oxygens--;
+  printk("DEBUG:  There are %d oxygens.\n", oxygens);
   m_unlock(&mutex);
   return count;
 }
@@ -301,6 +302,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
         goto finally;
       }
       printk("DEBUG:  I'm awake %s\n", buf);
+      printk("DEBUG:  There's %d oxygens %s\n", oxygens, buf);
     }
   }
   count = 0;
