@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.20
+/// \version 1.0.9.21
 /// \since 1.0
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -141,6 +141,10 @@ static ssize_t enqueueHydrogen(const char *buf);
 /// Ends a writing process and returns a code indicating if it was successful or not.
 static void endWrite(int code, const char *buf);
 
+/// Writes the bytes of buf into the module and returns a code indicating if it was
+/// successful or not.
+static ssize_t writeBytes(size_t count, const char *buf);
+
 #pragma endregion
 
 /// Structure that declares the usual file access functions.
@@ -162,7 +166,7 @@ static int in, out, size;
 static KMutex mutex;
 /// Mutex conditions
 static KCondition cond, waitingMolecule, waitingHydrogen;
-static int hydrogens, oxygens, removedHydrogens;
+static int hydrogens, oxygens;
 #pragma endregion
 
 #pragma region : Declaration of the init and exit functions
@@ -185,7 +189,6 @@ int initH2O(void) {
   }
   oxygens = 0;
   hydrogens = 0;
-  removedHydrogens = 0;
   in = out = size = 0;
   m_init(&mutex);
   c_init(&cond);
@@ -299,16 +302,9 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     if (returnCode != 0) {
       endWrite(returnCode, buf);
     }
-
-    for (k = 0; k < count; k++) {
-      if (copy_from_user(bufferH2O + in, buf + k, 1) != 0) {
-        // The buffer's adress is invalid
-        count = -EFAULT;
-        goto finally;
-      }
-      printk("<1>write byte %c (%d) at %d\n", bufferH2O[in], bufferH2O[in], in);
-      in = (in + 1) % MAX_SIZE;
-      size++;
+    returnCode = writeBytes(count, buf);
+    if (returnCode != 0) {
+      endWrite(returnCode, buf);
     }
     hydrogens++;
     c_broadcast(&waitingHydrogen);
@@ -347,6 +343,20 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     printk("DEBUG:writeH2O: (((unlocked))) %s\n", buf);
     return count;
   }
+}
+
+static ssize_t writeBytes(size_t count, const char *buf) {
+  int k;
+  for (k = 0; k < count; k++) {
+    if (copy_from_user(bufferH2O + in, buf + k, 1) != 0) {
+      // The buffer's adress is invalid
+      return -EFAULT;
+    }
+    printk("<1>write byte %c (%d) at %d\n", bufferH2O[in], bufferH2O[in], in);
+    in = (in + 1) % MAX_SIZE;
+    size++;
+  }
+  return 0;
 }
 
 static ssize_t enqueueHydrogen(const char *buf) {
