@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.6.2
+/// \version 1.0.6.3
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -47,6 +47,8 @@
 #pragma endregion
 
 #include "kmutex.h"
+
+#pragma warning (disable : 4068 )
 
 MODULE_LICENSE("Dual BSD/GPL");
 
