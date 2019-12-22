@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.3.9
+/// \version 1.0.6.1
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -199,18 +199,20 @@ static int releaseH2O(struct inode *inode, struct file *pFile)
   return 0;
 }
 
-static ssize_t readH2O(struct file *pFile, char *buf,
-                       size_t ucount, loff_t *pFilePos)
+static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFilePos)
 {
   int k;
   ssize_t count = ucount;
 
   printk("<1>read %p %ld\n", pFile, count);
   m_lock(&mutex);
+  printk("DEBUG:readH2O:  lock (((aquired))) %s\n", buf);
 
   oxygens++;
+  printk("DEBUG:readH2O:  there's %d oxygens %s\n", oxygens, buf);
   while (hydrogens < 2)
   {
+    printk("DEBUG:readH2O:  Not enough hydrogens. Going to sleep %s\n", oxygens, buf);
     // The procedure waits if there's not enough hydrogens
     if (c_wait(&cond, &mutex))
     {
@@ -218,6 +220,7 @@ static ssize_t readH2O(struct file *pFile, char *buf,
       count = -EINTR;
       goto epilog;
     }
+    printk("DEBUG:readH2O:  I'm awake %s\n", oxygens, buf);
   }
 
   if (count > size)
@@ -242,7 +245,9 @@ static ssize_t readH2O(struct file *pFile, char *buf,
 
 epilog:
   c_broadcast(&cond);
+  printk("DEBUG:readH2O:  Broadcasting %s\n", oxygens, buf);
   m_unlock(&mutex);
+  printk("DEBUG:readH2O:  (((Unlocked))) %s\n", oxygens, buf);
   return count;
 }
 
@@ -254,6 +259,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
 
   printk("<1>write %p %ld\n", pFile, count);
   m_lock(&mutex);
+  printk("DEBUG:writeH2O: lock (((aquired))) %s\n", buf);
   try:
   {
     for (k = 0; k < count; k++)
@@ -269,8 +275,10 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       size++;
     }
     hydrogens++;
+    printk("DEBUG:writeH2O: There's %d hydrogens %s\n", hydrogens, buf);
     while (oxygens < 1)
     {
+      printk("DEBUG:writeH2O: Not enough oxygens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
       if (c_wait(&cond, &mutex))
       {
@@ -278,12 +286,15 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
         count = -EINTR;
         goto finally;
       }
+      printk("DEBUG:writeH2O: I'm awake %s\n", buf);
       c_broadcast(&cond);
+      printk("DEBUG:writeH2O: Broadcasting %s\n", buf);
     }
   }
   finally:
   {
     m_unlock(&mutex);
+    printk("DEBUG:writeH2O: (((unlocked))) %s\n", buf);
     return count;
   }
 }
