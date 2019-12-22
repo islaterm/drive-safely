@@ -30,13 +30,15 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.19
+/// \version 1.0.9.20
 /// \since 1.0
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-label"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunknown-attributes"
+
+#pragma region : Header
 
 #pragma region : Necessary includes for device drivers
 
@@ -125,6 +127,22 @@ int initH2O(void);
 
 #pragma endregion
 
+#pragma region : Helper functions
+
+/// Enqueues an atom of hydrogen to form a water molecule.
+/// If there's already 2 hydrogens in the queue, this function waits until a molecule is
+/// created.
+///
+/// \param buf
+///     the data contained in the atom.
+/// \return 0 if the operation was successful or an error code otherwise.
+static ssize_t enqueueHydrogen(const char *buf);
+
+/// Ends a writing process and returns a code indicating if it was successful or not.
+static void endWrite(int code, const char *buf);
+
+#pragma endregion
+
 /// Structure that declares the usual file access functions.
 struct file_operations pH2OFileOperations = {
     .read =  readH2O,
@@ -151,6 +169,10 @@ static int hydrogens, oxygens, removedHydrogens;
 module_init(initH2O);
 module_exit(exitH2O);
 #pragma endregion
+
+#pragma endregion
+
+#pragma region : Implementation
 
 int initH2O(void) {
   int returnCode;
@@ -265,7 +287,7 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
 
 static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
                         loff_t *pFilePos) {
-  int k;
+  int k, returnCode = 0;
   ssize_t count = ucount;
 
   printk("<1>write %p %ld\n", pFile, count);
@@ -273,15 +295,9 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   printk("DEBUG:writeH2O: lock (((aquired))) %s\n", buf);
   try:
   {
-    while (hydrogens >= 2) {
-      printk("DEBUG:writeH2O: Too much hydrogen. Going to sleep %s\n", buf);
-      // The process waits if there's not enough oxygens to form a molecule
-      if (c_wait(&waitingMolecule, &mutex)) {
-        printk("<1>write interrupted\n");
-        count = -EINTR;
-        goto finally;
-      }
-      printk("DEBUG:writeH2O: I'm awake %s\n", buf);
+    returnCode = enqueueHydrogen(buf);
+    if (returnCode != 0) {
+      endWrite(returnCode, buf);
     }
 
     for (k = 0; k < count; k++) {
@@ -333,6 +349,22 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   }
 }
 
-#pragma clang diagnostic pop
+static ssize_t enqueueHydrogen(const char *buf) {
+  while (hydrogens >= 2) {
+    printk("DEBUG:writeH2O: Too much hydrogen. Going to sleep %s\n", buf);
+    // The process waits if there's not enough oxygens to form a molecule
+    if (c_wait(&waitingMolecule, &mutex)) {
+      printk("<1>write interrupted\n");
+      return -EINTR;
+    }
+    printk("DEBUG:writeH2O: I'm awake %s\n", buf);
+  }
+  return 0;
+}
 
-#pragma clang diagnostic pop
+void endWrite(int code, const char *buf) {
+  m_unlock(&mutex);
+  printk("DEBUG:writeH2O: (((unlocked))) %s\n", buf);
+}
+
+#pragma endregion
