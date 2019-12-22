@@ -121,10 +121,10 @@ int initH2O(void);
 
 /// Structure that declares the usual file access functions.
 struct file_operations pH2OFileOperations = {
-        .read =  readH2O,
-        .write =  writeH2O,
-        .open =  openH2O,
-        .release =  releaseH2O
+        read : readH2O,
+        write : writeH2O,
+        open : openH2O,
+        release : releaseH2O
 };
 
 /// Major number
