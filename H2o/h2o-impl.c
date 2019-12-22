@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.11
+/// \version 1.0.9.12
 /// \since 1.0
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -138,7 +138,7 @@ static int in, out, size;
 static KMutex mutex;
 /// Mutex conditions
 static KCondition cond, waitingMolecule, waitingHydrogen;
-static int hydrogens, oxygens;
+static int hydrogens, oxygens, removedHydrogens;
 #pragma endregion
 
 #pragma region : Declaration of the init and exit functions
@@ -159,6 +159,7 @@ int initH2O(void)
   }
   oxygens = 0;
   hydrogens = 0;
+  removedHydrogens = 0;
   in = out = size = 0;
   m_init(&mutex);
   c_init(&cond);
@@ -330,12 +331,14 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
       c_broadcast(&cond);
     }
-    if (hydrogens > 0 && oxygens > 0)
+    if (++removedHydrogens == 2)
     {
-      hydrogens--;
+      printk("DEBUG:writeH2O: Removing  %s\n", buf);
       oxygens--;
       c_broadcast(&waitingMolecule);
+      removedHydrogens = 0;
     }
+    hydrogens--;
   }
   finally:
   {
