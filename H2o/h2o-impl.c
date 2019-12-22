@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.7
+/// \version 1.0.9.8
 /// \since 1.0
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -260,7 +260,6 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   {
     c_broadcast(&cond);
     printk("DEBUG:readH2O:  Broadcasting %s\n", bufferH2O);
-    oxygens--;
     m_unlock(&mutex);
     printk("DEBUG:readH2O:  (((Unlocked))) %s\n", bufferH2O);
     return count;
@@ -332,6 +331,11 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       c_broadcast(&cond);
     }
     hydrogens--;
+    if (oxygens > 0)
+    {
+      oxygens--;
+    }
+    
     c_broadcast(&releasedHydrogen);
   }
   finally:
