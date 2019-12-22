@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.6
+/// \version 1.0.9.7
 /// \since 1.0
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -52,10 +52,7 @@
 #include "kmutex.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
-#pragma region : macros
-/// Raises an exception
-#define throw() goto finally
-
+#pragma region : global declarations
 /// Size of the buffer to store data
 #define MAX_SIZE 8192
 #pragma endregion
@@ -233,7 +230,7 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
       {
         printk("<1>read interrupted\n");
         count = -EINTR;
-        throw();
+        goto finally;
       }
       printk("DEBUG:readH2O:  I'm awake %s\n", bufferH2O);
     }
@@ -250,7 +247,7 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
       {
         /* el valor de buf es una direccion invalida */
         count = -EFAULT;
-        throw();
+        goto finally;
       }
       printk("<1>read byte %c (%d) from %d\n",
              bufferH2O[out], bufferH2O[out], out);
@@ -289,7 +286,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       {
         printk("<1>write interrupted\n");
         count = -EINTR;
-        throw();
+        goto finally;
       }
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
     }
@@ -300,7 +297,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       {
         // The buffer's adress is invalid
         count = -EFAULT;
-        throw();
+        goto finally;
       }
       printk("<1>write byte %c (%d) at %d\n", bufferH2O[in], bufferH2O[in], in);
       in = (in + 1) % MAX_SIZE;
@@ -317,7 +314,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       {
         printk("<1>write interrupted\n");
         count = -EINTR;
-        throw();
+        goto finally;
       }
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
     }
@@ -329,7 +326,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       {
         printk("<1>write interrupted\n");
         count = -EINTR;
-        throw();
+        goto finally;
       }
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
       c_broadcast(&cond);
