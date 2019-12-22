@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.8.2
+/// \version 1.0.8.3
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -302,7 +302,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     {
       printk("DEBUG:writeH2O: Not enough hydrogens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
-      if (c_wait(&waitingHydrogens, &mutex))
+      if (c_wait(&waitingHydrogen, &mutex))
       {
         printk("<1>write interrupted\n");
         count = -EINTR;
