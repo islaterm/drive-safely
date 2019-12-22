@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.6.3
+/// \version 1.0.6.4
 /// \since 1.0
 
 #pragma region : Necessary includes for device drivers
@@ -221,7 +221,7 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   {
     printk("DEBUG:readH2O:  Not enough hydrogens. Going to sleep %s\n", oxygens, buf);
     // The procedure waits if there's not enough hydrogens
-    if (c_wait(&waitHydrogenCond, &mutex))
+    if (c_wait(&cond, &mutex))
     {
       printk("<1>read interrupted\n");
       count = -EINTR;
@@ -300,7 +300,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     {
       printk("DEBUG:writeH2O: Not enough oxygens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
-      if (c_wait(&waitOxygenCond, &mutex))
+      if (c_wait(&cond, &mutex))
       {
         printk("<1>write interrupted\n");
         count = -EINTR;
@@ -318,7 +318,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     printk("DEBUG:writeH2O: (((unlocked))) %s\n", buf);
     return count;
   }
-  c_broadcast(&waitHydrogenCond);
+  c_broadcast(&cond);
   m_unlock(&mutex);
   printk("DEBUG:  Returning.\n");
   return count;
