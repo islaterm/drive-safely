@@ -52,9 +52,13 @@
 #include "kmutex.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
+#pragma region : macros
+/// Raises an exception
+#define throw()(goto finally)
 
 /// Size of the buffer to store data
 #define MAX_SIZE 8192
+#pragma endregion
 
 #pragma region : Declaration of h2o.c functions
 /// Opens the H2O module.
@@ -219,45 +223,50 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
 
   oxygens++;
   printk("DEBUG:readH2O:  there's %d oxygens %s\n", oxygens, bufferH2O);
-  while (hydrogens < 2)
+  try:
   {
-    printk("DEBUG:readH2O:  Not enough hydrogens. Going to sleep %s\n", bufferH2O);
-    // The procedure waits if there's not enough hydrogens
-    if (c_wait(&waitingHydrogen, &mutex))
+    while (hydrogens < 2)
     {
-      printk("<1>read interrupted\n");
-      count = -EINTR;
-      goto epilog;
+      printk("DEBUG:readH2O:  Not enough hydrogens. Going to sleep %s\n", bufferH2O);
+      // The procedure waits if there's not enough hydrogens
+      if (c_wait(&waitingHydrogen, &mutex))
+      {
+        printk("<1>read interrupted\n");
+        count = -EINTR;
+        throw();
+      }
+      printk("DEBUG:readH2O:  I'm awake %s\n", bufferH2O);
     }
-    printk("DEBUG:readH2O:  I'm awake %s\n", bufferH2O);
-  }
 
-  if (count > size)
-  {
-    count = size;
-  }
-
-  /* Transfiriendo datos hacia el espacio del usuario */
-  for (k = 0; k < count; k++)
-  {
-    if (copy_to_user(buf + k, bufferH2O + out, 1) != 0)
+    if (count > size)
     {
-      /* el valor de buf es una direccion invalida */
-      count = -EFAULT;
-      goto epilog;
+      count = size;
     }
-    printk("<1>read byte %c (%d) from %d\n",
-           bufferH2O[out], bufferH2O[out], out);
-    out = (out + 1) % MAX_SIZE;
-    size--;
+
+    /* Transfiriendo datos hacia el espacio del usuario */
+    for (k = 0; k < count; k++)
+    {
+      if (copy_to_user(buf + k, bufferH2O + out, 1) != 0)
+      {
+        /* el valor de buf es una direccion invalida */
+        count = -EFAULT;
+        throw();
+      }
+      printk("<1>read byte %c (%d) from %d\n",
+             bufferH2O[out], bufferH2O[out], out);
+      out = (out + 1) % MAX_SIZE;
+      size--;
+    }
   }
 
-epilog:
-  c_broadcast(&cond);
-  printk("DEBUG:readH2O:  Broadcasting %s\n", bufferH2O);
-  m_unlock(&mutex);
-  printk("DEBUG:readH2O:  (((Unlocked))) %s\n", bufferH2O);
-  return count;
+  finally:
+  {
+    c_broadcast(&cond);
+    printk("DEBUG:readH2O:  Broadcasting %s\n", bufferH2O);
+    m_unlock(&mutex);
+    printk("DEBUG:readH2O:  (((Unlocked))) %s\n", bufferH2O);
+    return count;
+  }
 }
 
 static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
@@ -279,18 +288,18 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       {
         printk("<1>write interrupted\n");
         count = -EINTR;
-        goto finally;
+        throw();
       }
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
     }
-    
+
     for (k = 0; k < count; k++)
     {
       if (copy_from_user(bufferH2O + in, buf + k, 1) != 0)
       {
         // The buffer's adress is invalid
         count = -EFAULT;
-        goto finally;
+        throw();
       }
       printk("<1>write byte %c (%d) at %d\n", bufferH2O[in], bufferH2O[in], in);
       in = (in + 1) % MAX_SIZE;
@@ -307,7 +316,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       {
         printk("<1>write interrupted\n");
         count = -EINTR;
-        goto finally;
+        throw();
       }
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
     }
@@ -319,7 +328,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       {
         printk("<1>write interrupted\n");
         count = -EINTR;
-        goto finally;
+        throw();
       }
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
       c_broadcast(&cond);
@@ -333,8 +342,4 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     printk("DEBUG:writeH2O: (((unlocked))) %s\n", buf);
     return count;
   }
-  c_broadcast(&cond);
-  m_unlock(&mutex);
-  printk("DEBUG:  Returning.\n");
-  return count;
 }
