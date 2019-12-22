@@ -33,8 +33,6 @@
 /// \version 1.0.9.19
 /// \since 1.0
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunknown-attributes"
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-label"
 #pragma clang diagnostic push
