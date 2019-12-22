@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.8
+/// \version 1.0.9.9
 /// \since 1.0
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -137,7 +137,7 @@ static int in, out, size;
 /// H2O's mutex
 static KMutex mutex;
 /// Mutex conditions
-static KCondition cond, releasedHydrogen, waitingHydrogen;
+static KCondition cond, waitingMolecule, waitingHydrogen;
 static int hydrogens, oxygens;
 #pragma endregion
 
@@ -162,7 +162,7 @@ int initH2O(void)
   in = out = size = 0;
   m_init(&mutex);
   c_init(&cond);
-  c_init(&releasedHydrogen);
+  c_init(&waitingMolecule);
   c_init(&waitingHydrogen);
 
   /* Allocating bufferH2O */
@@ -281,7 +281,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     {
       printk("DEBUG:writeH2O: Too much hydrogen. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
-      if (c_wait(&releasedHydrogen, &mutex))
+      if (c_wait(&waitingMolecule, &mutex))
       {
         printk("<1>write interrupted\n");
         count = -EINTR;
@@ -317,7 +317,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       }
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
     }
-    while (oxygens < 1)
+    while (oxygens < 1 && hydrogens < 2)
     {
       printk("DEBUG:writeH2O: Not enough oxygens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
@@ -336,7 +336,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       oxygens--;
     }
     
-    c_broadcast(&releasedHydrogen);
+    c_broadcast(&waitingMolecule);
   }
   finally:
   {
