@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.13
+/// \version 1.0.9.17
 /// \since 1.0
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
