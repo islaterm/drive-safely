@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.9.10
+/// \version 1.0.9.11
 /// \since 1.0
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -330,9 +330,9 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
       c_broadcast(&cond);
     }
-    hydrogens--;
     if (hydrogens > 0 && oxygens > 0)
     {
+      hydrogens--;
       oxygens--;
       c_broadcast(&waitingMolecule);
     }
