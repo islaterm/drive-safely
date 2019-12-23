@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.10
+* @version  1.0.13.11
 * @since    1.0
 */
 
@@ -48,7 +48,7 @@ static char *bufferH2O;
 static int in, out, size, k;
 static KMutex mutex;
 static KCondition cond;
-static KCondition printed;
+static KCondition waitingMolecule;
 #pragma endregion
 #pragma region Declaration of h2o.c functions
 
@@ -89,7 +89,7 @@ static int releaseH2O(struct inode *inode, struct file *pFile);
  * @returns the number of bytes read, 0 if it reaches the file's end or an error code if
  *          the read operation fails.
  */
-static ssize_t readH2O(struct file *pFile, char *buf, size_t count, loff_t *pFilePos);
+static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFilePos);
 
 /**
  * Adds a hydrogen particle to the file.
@@ -106,7 +106,7 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t count, loff_t *pFil
  * @param pFilePos
  *     the position from where the bytes should be written.
  */
-static ssize_t writeH2O(struct file *pFile, const char *buf, size_t count,
+static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
                         loff_t *pFilePos);
 
 /// Unregisters the H2O driver and releases it's buffer.
@@ -124,7 +124,7 @@ module_init(initH2O);
 module_exit(exitH2O);
 
 /// Structure that declares the usual file access functions.
-struct file_operations h2o_fops = {
+struct file_operations fileOperations = {
     .read =  readH2O,
     .write =  writeH2O,
     .open =  openH2O,
@@ -134,22 +134,20 @@ struct file_operations h2o_fops = {
 #pragma region : Implementation
 
 int initH2O(void) {
-  int rc;
-
-  /* Registering device */
-  rc = register_chrdev(majorH2O, "h2o", &h2o_fops);
-  if (rc < 0) {
-    printk(
-        "<1>h2o: cannot obtain major number %d\n", majorH2O);
-    return rc;
+  int response;
+  // Registering device
+  response = register_chrdev(majorH2O, "h2o", &fileOperations);
+  if (response < 0) {
+    printk("ERROR:initH2O: Cannot obtain major number %d\n", majorH2O);
+    return response;
   }
 
   in = out = size = 0;
   m_init(&mutex);
   c_init(&cond);
-  c_init(&printed);
+  c_init(&waitingMolecule);
 
-  /* Allocating bufferH2O */
+  // Allocating bufferH2O
   bufferH2O = kmalloc(MAX_SIZE, GFP_KERNEL);
   if (bufferH2O == NULL) {
     exitH2O();
@@ -157,7 +155,7 @@ int initH2O(void) {
   }
   memset(bufferH2O, 0, MAX_SIZE);
 
-  printk("<1>Inserting h2o module\n");
+  printk("INFO:initH2O: Inserting h2o module\n");
   return 0;
 }
 
@@ -187,8 +185,8 @@ static int releaseH2O(struct inode *inode, struct file *pFile) {
 }
 
 static ssize_t readH2O(struct file *pFile, char *buf,
-                       size_t count, loff_t *pFilePos) {
-  ssize_t ucount = count;
+                       size_t ucount, loff_t *pFilePos) {
+  ssize_t count = ucount;
 
   printk("<1>read %p %ld\n", pFile, count);
   m_lock(&mutex);
@@ -215,7 +213,7 @@ static ssize_t readH2O(struct file *pFile, char *buf,
     out = (out + 1) % MAX_SIZE;
     size--;
   }
-  c_broadcast(&printed);
+  c_broadcast(&waitingMolecule);
   epilog:
   c_broadcast(&cond);
   m_unlock(&mutex);
@@ -223,13 +221,13 @@ static ssize_t readH2O(struct file *pFile, char *buf,
 }
 
 static ssize_t writeH2O(struct file *pFile, const char *buf,
-                        size_t count, loff_t *pFilePos) {
-  ssize_t ucount = count;
+                        size_t ucount, loff_t *pFilePos) {
+  ssize_t count = ucount;
 
   printk("<1>write %p %ld\n", pFile, count);
   m_lock(&mutex);
   while (size == MAX_SIZE) {
-    c_wait(&printed, &mutex);
+    c_wait(&waitingMolecule, &mutex);
   }
 
   for (k = 0; k < count; k++) {
@@ -254,7 +252,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf,
     size++;
     c_broadcast(&cond);
   }
-  c_wait(&printed, &mutex);
+  c_wait(&waitingMolecule, &mutex);
 
   epilog:
   m_unlock(&mutex);
