@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.14
+* @version  1.0.13.15
 * @since    1.0
 */
 
@@ -126,6 +126,8 @@ static ssize_t end(ssize_t code, char *buf, const char *context);
 
 static ssize_t waitHydrogen(void);
 
+static ssize_t createMolecule(char *buf);
+
 #pragma endregion
 #pragma endregion
 
@@ -204,26 +206,23 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   if ((response = waitHydrogen()) != 0) {
     return endRead(response);
   }
-  if (count > size) {
-    count = size;
-  }
-  /* Transfiriendo datos hacia el espacio del usuario */
+  response = createMolecule(buf);
+  return endRead(response);
+}
+
+static ssize_t createMolecule(char *buf) {
   for (k = 0; k < 8; k++) {
     if (copy_to_user(buf + k, bufferH2O + out, 1) != 0) {
-      /* el valor de buf es una direccion invalida */
-      count = -EFAULT;
-      goto epilog;
+      printk("ERROR:readH2O:createMolecule: Invalid adress");
+      return -EFAULT;
     }
-    printk("<1>read byte %c (%d) from %d\n",
-           bufferH2O[out], bufferH2O[out], out);
+    printk("INFO:readH2O:createMolecule: Read byte %c (%d) from %d\n", bufferH2O[out],
+           bufferH2O[out], out);
     out = (out + 1) % MAX_SIZE;
     size--;
   }
   c_broadcast(&waitingMolecule);
-  epilog:
-  c_broadcast(&waitingHydrogen);
-  m_unlock(&mutex);
-  return count;
+  return 0;
 }
 
 static ssize_t waitHydrogen(void) {
@@ -287,7 +286,6 @@ static ssize_t endWrite(int code, const char *buf) {
 
 static ssize_t end(ssize_t code, char *buf, const char *context) {
   m_unlock(&mutex);
-  printk("DEBUG:%s: (((unlocked))) %s\n", context, buf);
   return code;
 }
 
