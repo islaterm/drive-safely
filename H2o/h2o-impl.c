@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.13
+* @version  1.0.13.14
 * @since    1.0
 */
 
@@ -47,8 +47,7 @@ int majorH2O = 60;
 static char *bufferH2O;
 static int in, out, size, k;
 static KMutex mutex;
-static KCondition cond;
-static KCondition waitingMolecule;
+static KCondition waitingHydrogen, waitingMolecule;
 #pragma endregion
 #pragma region Declaration of h2o.c functions
 
@@ -116,6 +115,18 @@ void exitH2O(void);
 int initH2O(void);
 
 #pragma endregion
+#pragma Helper functions
+
+/// Ends a writing process and returns a code indicating if it was successful or not.
+static ssize_t endWrite(int code, const char *buf);
+
+static ssize_t endRead(ssize_t code);
+
+static ssize_t end(ssize_t code, char *buf, const char *context);
+
+static ssize_t waitHydrogen(void);
+
+#pragma endregion
 #pragma endregion
 
 MODULE_LICENSE("Dual BSD/GPL");
@@ -144,7 +155,7 @@ int initH2O(void) {
 
   in = out = size = 0;
   m_init(&mutex);
-  c_init(&cond);
+  c_init(&waitingHydrogen);
   c_init(&waitingMolecule);
 
   // Allocating bufferH2O
@@ -186,16 +197,12 @@ static int releaseH2O(struct inode *inode, struct file *pFile) {
 
 static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFilePos) {
   ssize_t count = ucount;
+  ssize_t response;
 
-  printk("<1>read %p %ld\n", pFile, count);
+  printk("INFO:readH2O: Read %p %ld\n", pFile, count);
   m_lock(&mutex);
-  while (size < 8) {
-    /* si l buffer no tiene suficientes hidrogenos, el lector espera */
-    if (c_wait(&cond, &mutex)) {
-      printk("<1>read interrupted\n");
-      count = -EINTR;
-      goto epilog;
-    }
+  if ((response = waitHydrogen()) != 0) {
+    return endRead(response);
   }
   if (count > size) {
     count = size;
@@ -214,16 +221,26 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   }
   c_broadcast(&waitingMolecule);
   epilog:
-  c_broadcast(&cond);
+  c_broadcast(&waitingHydrogen);
   m_unlock(&mutex);
   return count;
+}
+
+static ssize_t waitHydrogen(void) {
+  while (size < 8) {
+    if (c_wait(&waitingHydrogen, &mutex)) {
+      printk("INFO:readH2O:waitHydrogen: Interrupted.\n");
+      return -EINTR;
+    }
+  }
+  return 0;
 }
 
 static ssize_t writeH2O(struct file *pFile, const char *buf,
                         size_t ucount, loff_t *pFilePos) {
   ssize_t count = ucount;
 
-  printk("<1>write %p %ld\n", pFile, count);
+  printk("INFO:writeH2O: Write %p %ld\n", pFile, count);
   m_lock(&mutex);
   while (size == MAX_SIZE) {
     c_wait(&waitingMolecule, &mutex);
@@ -232,7 +249,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf,
   for (k = 0; k < count; k++) {
     while (size == MAX_SIZE) {
       /* si el buffer esta lleno, el escritor espera */
-      if (c_wait(&cond, &mutex)) {
+      if (c_wait(&waitingHydrogen, &mutex)) {
         printk("<1>write interrupted\n");
         count = -EINTR;
         goto epilog;
@@ -249,7 +266,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf,
            bufferH2O[in], bufferH2O[in], in);
     in = (in + 1) % MAX_SIZE;
     size++;
-    c_broadcast(&cond);
+    c_broadcast(&waitingHydrogen);
   }
   c_wait(&waitingMolecule, &mutex);
 
@@ -258,4 +275,21 @@ static ssize_t writeH2O(struct file *pFile, const char *buf,
   return count;
 }
 
+#pragma region : ending functions
+
+static ssize_t endRead(ssize_t code) {
+  return end(code, bufferH2O, "readH2O");
+}
+
+static ssize_t endWrite(int code, const char *buf) {
+  return end(code, (char *) buf, "writeH2O");
+}
+
+static ssize_t end(ssize_t code, char *buf, const char *context) {
+  m_unlock(&mutex);
+  printk("DEBUG:%s: (((unlocked))) %s\n", context, buf);
+  return code;
+}
+
+#pragma endregion
 #pragma endregion
