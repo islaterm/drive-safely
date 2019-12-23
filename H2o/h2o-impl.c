@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.3
+* @version  1.0.13.4
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -143,7 +143,7 @@ static int waitMolecule(const char *buf);
 static int
 wait(KCondition *condition, const char *buf, const char *context, const char *msg);
 
-static ssize_t waitHydrogen();
+static ssize_t waitHydrogen(void);
 
 static ssize_t endRead(ssize_t code);
 
@@ -299,7 +299,7 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   }
 }
 
-static ssize_t waitHydrogen() {
+static ssize_t waitHydrogen(void) {
   while (hydro1 == NULL && hydro2 == NULL) {
     printk("DEBUG:readH2O:waitHydrogen: Not enough hydrogens. Going to sleep %s\n",
            bufferH2O);
