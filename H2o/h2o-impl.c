@@ -29,18 +29,18 @@
 * |                           |                           |                           | ``<Control+C>``      |
 * |                           |                           |                           | ``$``                |
 *
-* \author Ignacio Slater Muñoz
-* \version 1.0.10.5
-* \since 1.0
+* @author   Ignacio Slater Muñoz
+* @version  1.0.10.6
+* @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-label"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunknown-attributes"
 
-// region : Header
+#pragma region : Header
 
-// region : Necessary includes for device drivers
+#pragma region : Necessary includes for device drivers
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -53,117 +53,123 @@
 #include <linux/fcntl.h>   // O_ACCMODE
 #include <linux/uaccess.h> // copy_from/to_user
 
-// endregion
+#pragma endregion
 
 #include "kmutex.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
-// region : global declarations
-/** Size of the buffer to store data*/
+#pragma region : global declarations
+/** Size of the buffer to store data.   */
 #define MAX_SIZE 8192
-// endregion
+#pragma endregion
 
-// region : Declaration of h2o.c functions
+#pragma region : Declaration of h2o.c functions
 
 /**
-* Opens the H2O module.
-* Each time the module is opened, it's file descriptor is different.
-*
-* \param inode
-*     a struct containing the characteristics of the file.
-* \param pFile
-*     the file descriptor.
-* \returns 0 if the operation was succesfull; an error code otherwise.
+ * Opens the H2O module.
+ * Each time the module is opened, it's file descriptor is different.
+ *
+ * @param inode
+ *     a struct containing the characteristics of the file.
+ * @param pFile
+ *     the file descriptor.
+ * @returns 0 if the operation was succesfull; an error code otherwise.
  */
 static int openH2O(struct inode *inode, struct file *pFile);
 
 /**
-* Closes the H2O module.
-* Each time the module is opened, it's file descriptor is different.
-*
-* \param inode
-*     a struct containing the characteristics of the file.
-* \param pFile
-*     the file descriptor.
-*
-* \returns 0 if the operation was succesfull; an error code otherwise.
-*/static int releaseH2O(struct inode *inode, struct file *pFile);
+ * Closes the H2O module.
+ * Each time the module is opened, it's file descriptor is different.
+ *
+ * @param inode
+ *     a struct containing the characteristics of the file.
+ * @param pFile
+ *     the file descriptor.
+ *
+ * @returns 0 if the operation was succesfull; an error code otherwise.
+ */
+static int releaseH2O(struct inode *inode, struct file *pFile);
 
 /**
-* Reads a fragment of the file.
-* If there are bytes remaining to be read from ``pFilePos``, then the function returns
-* ``count`` and ``pFilePos`` is moved to the first unread byte.
-*
-* \param pFile
-*     the file descriptor.
-* \param buf
-*     the direction where the read data should be placed.
-* \param count
-*     the maximum number of bytes to read.
-* \param pFilePos
-*     the position from where the bytes should be read.
-*
-* \returns the number of bytes read, 0 if it reaches the file's end or an error code if
-*     the read operation fails.
-*/static ssize_t readH2O(struct file *pFile, char *buf, size_t count, loff_t *pFilePos);
+ * Reads a fragment of the file.
+ *
+ * If there are bytes remaining to be read from ``pFilePos``, then the function returns
+ * ``count`` and ``pFilePos`` is moved to the first unread byte.
+ *
+ * @param pFile     the file descriptor.
+ * @param buf       the direction where the read data should be placed.
+ * @param count     the maximum number of bytes to read.
+ * @param pFilePos  the position from where the bytes should be read.
+ *
+ * @returns the number of bytes read, 0 if it reaches the file's end or an error code if
+ *          the read operation fails.
+ */
+static ssize_t readH2O(struct file *pFile, char *buf, size_t count, loff_t *pFilePos);
 
 /**
-* Adds a hydrogen particle to the file.
-* If the number of bytes to be written is larger than the maximum buffer size, then only
-* the bytes that doesn't exceed the buffer size are written to the file and an error
-* code is returned.
-*
-* \param pFile
-*     the file descriptor.
-* \param buf
-*     the data to be written in the file.
-* \param count
-*     the maximum number of bytes to write.
-* \param pFilePos
-*     the position from where the bytes should be written.
-*/static ssize_t writeH2O(struct file *pFile, const char *buf, size_t count,
-                          loff_t *pFilePos);
+ * Adds a hydrogen particle to the file.
+ * If the number of bytes to be written is larger than the maximum buffer size, then only
+ * the bytes that doesn't exceed the buffer size are written to the file and an error
+ * code is returned.
+ *
+ * @param pFile
+ *     the file descriptor.
+ * @param buf
+ *     the data to be written in the file.
+ * @param count
+ *     the maximum number of bytes to write.
+ * @param pFilePos
+ *     the position from where the bytes should be written.
+ */
+static ssize_t writeH2O(struct file *pFile, const char *buf, size_t count,
+                        loff_t *pFilePos);
 
-/** Unregisters the H2O driver and releases it's buffer.
-*/void exitH2O(void);
+/** Unregisters the H2O driver and releases it's buffer.  */
+void exitH2O(void);
 
-/** Registers the H2O driver and initializes it's buffer.
-*/int initH2O(void);
+/** Registers the H2O driver and initializes it's buffer. */
+int initH2O(void);
 
-// endregion
+#pragma endregion
 
-// region : Helper functions
-/**
-* Enqueues an atom of hydrogen to form a water molecule.
-* If there's already 2 hydrogens in the queue, this function waits until a molecule is
-* created.
-*
-* \param buf
-*     the data contained in the atom.
-* \return 0 if the operation was successful or an error code otherwise.
-*/static ssize_t enqueueHydrogen(const char *buf);
-
-/** Ends a writing process and returns a code indicating if it was successful or not.
-*/static void endWrite(int code, const char *buf);
+#pragma region : Helper functions
 
 /**
-* Writes the bytes of buf into the module and returns a code indicating if it was
-* successful or not.
-*/static ssize_t writeBytes(size_t count, const char *buf);
+ * Enqueues an atom of hydrogen to form a water molecule.
+ * If there's already 2 hydrogens in the queue, this function waits until a molecule is
+ * created.
+ *
+ * @param buf
+ *     the data contained in the atom.
+ * \return 0 if the operation was successful or an error code otherwise.
+ */
+static ssize_t enqueueHydrogen(const char *buf);
 
-// endregion
+/** Ends a writing process and returns a code indicating if it was successful or not. */
+static void endWrite(int code, const char *buf);
 
-/** Structure that declares the usual file access functions.
-*/struct file_operations pH2OFileOperations = {
+/**
+ * Writes the bytes of buf into the module and returns a code indicating if it was
+ * successful or not.
+ */
+static ssize_t writeBytes(size_t count, const char *buf);
+
+/** Adds a new oxygen to the queue and triggers an event.   */
+static void enqueueOxygen();
+
+#pragma endregion
+
+/** Structure that declares the usual file access functions.  */
+struct file_operations pH2OFileOperations = {
     .read = readH2O,
     .write = writeH2O,
     .open = openH2O,
     .release = releaseH2O};
 
-/** Major number
-*/int h2oMajor = 60;
+/** Major number. */
+int h2oMajor = 60;
 
-// region : local variables
+#pragma region : local variables
 static char *bufferH2O;
 static int in, out, size;
 static const char
@@ -171,21 +177,25 @@ static const char
     TRUE = 1;
 
 /** H2O's mutex
-*/static KMutex mutex;
+*/
+static KMutex mutex;
 /** Mutex conditions
-*/static KCondition cond, waitingMolecule, waitingHydrogen;
+*/
+static KCondition cond, waitingMolecule, waitingHydrogen, waitingOxygen;
 static int enqueuedHydrogens, enqueuedOxygens;
 static int writtenHydrogens;
-// endregion
+#pragma endregion
 
-// region : Declaration of the init and exit functions
+#pragma region : Declaration of the init and exit functions
 module_init(initH2O);
 module_exit(exitH2O);
-// endregion
+#pragma endregion
 
-// endregion
+#pragma endregion
 
-// region : Implementation
+#pragma region : Implementation
+
+#pragma region : Init / Close module
 
 int initH2O(void) {
   int returnCode;
@@ -247,6 +257,10 @@ static int releaseH2O(struct inode *inode, struct file *pFile) {
   return 0;
 }
 
+#pragma endregion
+
+#pragma region : Read / Write
+
 static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFilePos) {
   int k;
   ssize_t count = ucount;
@@ -255,8 +269,7 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   m_lock(&mutex);
   printk("DEBUG:readH2O:  lock (((aquired))) %s\n", bufferH2O);
 
-  enqueuedOxygens++;
-  printk("DEBUG:readH2O:  there's %d oxygens %s\n", enqueuedOxygens, bufferH2O);
+  enqueueOxygen();
   try:
   {
     while (enqueuedHydrogens < 2) {
@@ -307,6 +320,13 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   }
 }
 
+static void enqueueOxygen() {
+  enqueuedOxygens++;
+  printk("DEBUG:readH2O:  there's %d oxygens. Broadcasting %s\n", enqueuedOxygens,
+         bufferH2O);
+  c_broadcast(&waitingOxygen);
+}
+
 static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
                         loff_t *pFilePos) {
   int k, returnCode = 0;
@@ -317,18 +337,18 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   printk("DEBUG:writeH2O: lock (((aquired))) %s\n", buf);
   try:
   {
-    enqueuedHydrogens++;
     printk("DEBUG:writeH2O: There's %d enqueued hydrogens %s\n", enqueuedHydrogens, buf);
     while (enqueuedOxygens < 1) {
       printk("DEBUG:writeH2O: Not enough oxygens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
-      if (c_wait(&cond, &mutex)) {
+      if (c_wait(&waitingOxygen, &mutex)) {
         printk("<1>write interrupted\n");
         count = -EINTR;
         goto finally;
       }
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
-      c_broadcast(&cond);
+      enqueuedHydrogens++;
+      c_broadcast(&waitingHydrogen);
     }
     returnCode = enqueueHydrogen(buf);
     if (returnCode != 0) {
@@ -364,6 +384,8 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   }
 }
 
+#pragma endregion
+
 static ssize_t writeBytes(size_t count, const char *buf) {
   int k;
   for (k = 0; k < count; k++) {
@@ -396,5 +418,5 @@ void endWrite(int code, const char *buf) {
   printk("DEBUG:writeH2O: (((unlocked))) %s\n", buf);
 }
 
-// endregion
+#pragma endregion
 #pragma clang diagnostic pop
