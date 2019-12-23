@@ -30,7 +30,7 @@
 * |                           |                           |                           | ``$``                |
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.10.5
+* @version  1.0.10.6
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -214,6 +214,7 @@ int initH2O(void) {
   c_init(&cond);
   c_init(&waitingMolecule);
   c_init(&waitingHydrogen);
+  c_init(&waitingOxygen);
 
   /* Allocating bufferH2O */
   bufferH2O = kmalloc(MAX_SIZE, GFP_KERNEL);
