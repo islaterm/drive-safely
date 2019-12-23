@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.11
+* @version  1.0.13.12
 * @since    1.0
 */
 
@@ -160,15 +160,15 @@ int initH2O(void) {
 }
 
 void exitH2O(void) {
-  /* Freeing the major number */
+  // Freeing the major number
   unregister_chrdev(majorH2O, "h2o");
 
-  /* Freeing buffer h2o */
+  // Freeing buffer h2o
   if (bufferH2O) {
     kfree(bufferH2O);
   }
 
-  printk("<1>Removing h2o module\n");
+  printk("INFO:exitH2O: Removing h2o module\n");
 }
 
 static int openH2O(struct inode *inode, struct file *pFile) {
