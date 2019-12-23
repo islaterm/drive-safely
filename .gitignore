@@ -1,4 +1,4 @@
-# Version 1.0.9.17
+# Version 1.0.10.3
 # Created by https://www.gitignore.io/api/c,linux,windows,assembler,visualstudiocode
 # Edit at https://www.gitignore.io/?templates=c,linux,windows,assembler,visualstudiocode
 
@@ -153,3 +153,12 @@ cmake-build-debug/CMakeFiles/Tarea_3___2019P.dir/linklibs.rsp
 cmake-build-debug/CMakeFiles/Tarea_3___2019P.dir/objects1.rsp
 cmake-build-debug/CMakeFiles/Tarea_3___2019P.dir/progress.make
 CMakeLists.txt
+/.vs/drive-safely/v16/Browse.VC.db
+/.vs/Tarea 3 - 2019P/v16/Browse.VC.db
+/drive-safely.sln
+/drive-safely.vcxproj
+/drive-safely.vcxproj.filters
+/.vs/Tarea 3 - 2019P/v16/ipch/AutoPCH/1b17f17cf6e6f01f/H2O-IMPL.ipch
+/.vs/ProjectSettings.json
+/.vs/slnx.sqlite
+/.vs/VSWorkspaceState.json
