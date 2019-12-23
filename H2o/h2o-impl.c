@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.12.4
+* @version  1.0.12.5
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -324,8 +324,10 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       endWrite(returnCode, buf);
     }
     c_broadcast(&waitingHydrogen);
-    returnCode = waitMolecule(buf);
-    while (enqueuedHydrogens < 2) {
+    if ((returnCode = waitMolecule(buf)) != 0) {
+      return endWrite(returnCode, buf);
+    }
+    while (hydro1 == NULL || hydro2 == NULL) {
       printk("DEBUG:writeH2O: Not enough hydrogens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
       if (c_wait(&waitingHydrogen, &mutex)) {
