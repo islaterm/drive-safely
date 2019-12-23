@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.4
+* @version  1.0.13.5
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -200,6 +200,8 @@ int initH2O(void) {
   m_init(&mutex);
   c_init(&cond);
   c_init(&waitingMolecule);
+  c_init(&waitingOxygen);
+  c_init(&waitingHydrogen);
 
   /* Allocating bufferH2O */
   bufferH2O = kmalloc(MAX_SIZE, GFP_KERNEL);
