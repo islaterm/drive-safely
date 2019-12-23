@@ -12,13 +12,11 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.10-snapshot
+* @version  1.0.13.3
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
-#pragma GCC diagnostic ignored "-Wunused-label"
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunknown-attributes"
 
 #pragma region : Header
 
@@ -41,8 +39,8 @@
 
 MODULE_LICENSE("Dual BSD/GPL");
 #pragma region : global declarations
-/** Size of the buffer to store data.   */
-#define MAX_SIZE 8192
+#define MAX_SIZE 8192 /// Size of the buffer to store data.
+int h2oMajor = 60;  /// Major number.
 #pragma endregion
 
 #pragma region : Declaration of h2o.c functions
@@ -114,19 +112,9 @@ int initH2O(void);
 
 #pragma region : Helper functions
 
-/**
- * Enqueues an atom of hydrogen to form a water molecule.
- * If there's already 2 hydrogens in the queue, this function waits until a molecule is
- * created.
- *
- * @param buf
- *     the data contained in the atom.
- * \return 0 if the operation was successful or an error code otherwise.
- */
-static ssize_t enqueueHydrogen(const char *buf);
-
 /** Ends a writing process and returns a code indicating if it was successful or not. */
 static ssize_t endWrite(int code, const char *buf);
+
 
 /**
  * Writes the bytes of buf into the module and returns a code indicating if it was
@@ -144,8 +132,8 @@ static void enqueueOxygen(void);
 static int waitOxygen(const char *buf);
 
 /**
- * Waits until an H2O molecule is created and returns a code indicating if the operation 
- * was successful or not. 
+ * Waits until an H2O molecule is created and returns a code indicating if the operation
+ * was successful or not.
  */
 static int waitMolecule(const char *buf);
 
@@ -154,6 +142,12 @@ static int waitMolecule(const char *buf);
  */
 static int
 wait(KCondition *condition, const char *buf, const char *context, const char *msg);
+
+static ssize_t waitHydrogen();
+
+static ssize_t endRead(ssize_t code);
+
+static ssize_t end(ssize_t code, char *buf, const char *context);
 
 #pragma endregion
 
@@ -164,29 +158,25 @@ struct file_operations pH2OFileOperations = {
     .open = openH2O,
     .release = releaseH2O};
 
-/** Major number. */
-int h2oMajor = 60;
-
 #pragma region : local variables
 static char *bufferH2O;
 static int in, out, size;
-static const char
-    FALSE = 0,
-    TRUE = 1;
 
-/** H2O's mutex
-*/
+// Module's mutex
 static KMutex mutex;
-/** Mutex conditions
-*/
-static KCondition cond, waitingMolecule, waitingHydrogen, waitingOxygen;
+// Mutex conditions
+static KCondition
+    cond, // Generic condition
+    waitingMolecule,  // Condition to wait for a molecule to be produced
+    waitingHydrogen, waitingOxygen;
 static int enqueuedHydrogens, enqueuedOxygens;
-static int writtenHydrogens;
+// Gener
+static char *hydro1, *hydro2;
 #pragma endregion
 
 #pragma region : Declaration of the init and exit functions
 module_init(initH2O);
-module_exit(exitH2O);
+module_exit(exitH2O)
 #pragma endregion
 
 #pragma endregion
@@ -206,13 +196,10 @@ int initH2O(void) {
   }
   enqueuedOxygens = 0;
   enqueuedHydrogens = 0;
-  writtenHydrogens = 0;
   in = out = size = 0;
   m_init(&mutex);
   c_init(&cond);
   c_init(&waitingMolecule);
-  c_init(&waitingHydrogen);
-  c_init(&waitingOxygen);
 
   /* Allocating bufferH2O */
   bufferH2O = kmalloc(MAX_SIZE, GFP_KERNEL);
@@ -257,48 +244,51 @@ static int releaseH2O(struct inode *inode, struct file *pFile) {
 }
 
 #pragma endregion
-
 #pragma region : Read / Write
 
 static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFilePos) {
-  int k;
   ssize_t count = ucount;
+  ssize_t returnCode = 0;
 
-  printk("<1>read %p %ld\n", pFile, count);
+  printk("INFO:readH2O: %p %ld\n", pFile, count);
   m_lock(&mutex);
   printk("DEBUG:readH2O:  lock (((aquired))) %s\n", bufferH2O);
 
-  enqueueOxygen();
-  try:
-  {
-    while (enqueuedHydrogens < 2) {
-      printk("DEBUG:readH2O:  There's %d enqueued hydrogens\n%s\n", enqueuedHydrogens,
-             bufferH2O);
-      printk("DEBUG:readH2O:  Not enough hydrogens. Going to sleep %s\n", bufferH2O);
-      // The procedure waits if there's not enough hydrogens
-      if (c_wait(&waitingHydrogen, &mutex)) {
-        printk("<1>read interrupted\n");
-        count = -EINTR;
-        goto finally;
-      }
-      printk("DEBUG:readH2O:  I'm awake %s\n", bufferH2O);
-    }
-    if (count > size) {
-      count = size;
-    }
-
-    //  Transfering data to user space
-    for (k = 0; k < count; k++) {
-      if (copy_to_user(buf + k, bufferH2O + out, 1) != 0) {
-        //  buf is an invalid adress
-        count = -EFAULT;
-        goto finally;
-      }
-      printk("<1>read byte %c (%d) from %d\n", bufferH2O[out], bufferH2O[out], out);
-      out = (out + 1) % MAX_SIZE;
-      size--;
-    }
+  // Waits until there's enough hydrogens
+  if ((returnCode = waitHydrogen()) != 0) {
+    return endRead(returnCode);
   }
+//  enqueueOxygen();
+//  try:
+//  {
+//    while (enqueuedHydrogens < 2) {
+//      printk("DEBUG:readH2O:  There's %d enqueued hydrogens\n%s\n", enqueuedHydrogens,
+//             bufferH2O);
+//      printk("DEBUG:readH2O:  Not enough hydrogens. Going to sleep %s\n", bufferH2O);
+//      // The procedure waits if there's not enough hydrogens
+//      if (c_wait(&waitingHydrogen, &mutex)) {
+//        printk("<1>read interrupted\n");
+//        count = -EINTR;
+//        goto finally;
+//      }
+//      printk("DEBUG:readH2O:  I'm awake %s\n", bufferH2O);
+//    }
+//    if (count > size) {
+//      count = size;
+//    }
+//
+//    //  Transfering data to user space
+//    for (k = 0; k < count; k++) {
+//      if (copy_to_user(buf + k, bufferH2O + out, 1) != 0) {
+//        //  buf is an invalid adress
+//        count = -EFAULT;
+//        goto finally;
+//      }
+//      printk("<1>read byte %c (%d) from %d\n", bufferH2O[out], bufferH2O[out], out);
+//      out = (out + 1) % MAX_SIZE;
+//      size--;
+//    }
+//  }
   finally:
   {
     c_broadcast(&waitingMolecule);
@@ -307,6 +297,18 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
     printk("DEBUG:readH2O:  (((Unlocked))) %s\n", bufferH2O);
     return count;
   }
+}
+
+static ssize_t waitHydrogen() {
+  while (hydro1 == NULL && hydro2 == NULL) {
+    printk("DEBUG:readH2O:waitHydrogen: Not enough hydrogens. Going to sleep %s\n",
+           bufferH2O);
+    if (c_wait(&cond, &mutex)) {
+      printk("INFO:readH2O:waitHydrogen: Interrupted %s\n", bufferH2O);
+      return -EINTR;
+    }
+  }
+  return 0;
 }
 
 static void enqueueOxygen(void) {
@@ -419,24 +421,21 @@ static ssize_t writeBytes(size_t count, const char *buf) {
   return 0;
 }
 
-static ssize_t enqueueHydrogen(const char *buf) {
-  while (enqueuedHydrogens >= 2) {
-    printk("DEBUG:writeH2O: Too much hydrogen. Going to sleep %s\n", buf);
-    // The process waits if there's not enough oxygens to form a molecule
-    if (c_wait(&waitingMolecule, &mutex)) {
-      printk("<1>write interrupted\n");
-      return -EINTR;
-    }
-    printk("DEBUG:writeH2O: I'm awake %s\n", buf);
-  }
-  return 0;
+#pragma region : ending functions
+
+static ssize_t endRead(ssize_t code) {
+  return end(code, bufferH2O, "readH2O");
 }
 
-ssize_t endWrite(int code, const char *buf) {
+static ssize_t endWrite(int code, const char *buf) {
+  return end(code, (char *) buf, "writeH2O");
+}
+
+static ssize_t end(ssize_t code, char *buf, const char *context) {
   m_unlock(&mutex);
-  printk("DEBUG:writeH2O: (((unlocked))) %s\n", buf);
+  printk("DEBUG:%s: (((unlocked))) %s\n", context, buf);
   return code;
 }
 
 #pragma endregion
-#pragma clang diagnostic pop
+#pragma endregion
