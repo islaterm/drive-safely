@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.12.6
+* @version  1.0.12.7
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -291,6 +291,9 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   }
   finally:
   {
+    oxy = NULL;
+    hydro1 = NULL;
+    hydro2 = NULL;
     c_broadcast(&waitingMolecule);
     printk("DEBUG:readH2O:  Broadcasting %s\n", bufferH2O);
     m_unlock(&mutex);
