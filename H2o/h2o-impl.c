@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.6
+* @version  1.0.13.7
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -148,6 +148,8 @@ static ssize_t end(ssize_t code, char *buf, const char *context);
 
 static ssize_t produceHydrogen(const char *buf);
 
+static ssize_t createMolecule(ssize_t count, char *buf);
+
 #pragma endregion
 
 /** Structure that declares the usual file access functions.  */
@@ -259,42 +261,29 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   if ((returnCode = waitHydrogen()) != 0) {
     return endRead(returnCode);
   }
-//  enqueueOxygen();
-//  try:
-//  {
-//    while (enqueuedHydrogens < 2) {
-//      printk("DEBUG:readH2O:  There's %d enqueued hydrogens\n%s\n", enqueuedHydrogens,
-//             bufferH2O);
-//      printk("DEBUG:readH2O:  Not enough hydrogens. Going to sleep %s\n", bufferH2O);
-//      // The procedure waits if there's not enough hydrogens
-//      if (c_wait(&waitingHydrogen, &mutex)) {
-//        printk("<1>read interrupted\n");
-//        count = -EINTR;
-//        goto finally;
-//      }
-//      printk("DEBUG:readH2O:  I'm awake %s\n", bufferH2O);
-//    }
-//    if (count > size) {
-//      count = size;
-//    }
-//
-//    //  Transfering data to user space
-//    for (k = 0; k < count; k++) {
-//      if (copy_to_user(buf + k, bufferH2O + out, 1) != 0) {
-//        //  buf is an invalid adress
-//        count = -EFAULT;
-//        goto finally;
-//      }
-//      printk("<1>read byte %c (%d) from %d\n", bufferH2O[out], bufferH2O[out], out);
-//      out = (out + 1) % MAX_SIZE;
-//      size--;
-//    }
-//  }
+  if ((returnCode = createMolecule(count, buf)) != 0) {
+    return endRead(returnCode);
+  }
+  return endRead(returnCode);
+}
+
+static ssize_t createMolecule(ssize_t count, char *buf) {
+  int k;
+  if (count > size) {
+    count = size;
+  }
+  /* Transfiriendo datos hacia el espacio del usuario */
+  for (k = 0; k < count; k++) {
+    if (copy_to_user(buf + k, bufferH2O + out, 1) != 0) {
+      /* el valor de buf es una direccion invalida */
+      return -EFAULT;
+    }
+    printk("INFO:readH2O:createMolecule: byte %c (%d) from %d\n",
+           bufferH2O[out], bufferH2O[out], out);
+    out = (out + 1) % MAX_SIZE;
+    size--;
+  }
   c_broadcast(&waitingMolecule);
-  printk("DEBUG:readH2O:  Broadcasting %s\n", bufferH2O);
-  m_unlock(&mutex);
-  printk("DEBUG:readH2O:  (((Unlocked))) %s\n", bufferH2O);
-  return count;
 }
 
 static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
