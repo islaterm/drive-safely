@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.10.9
+* @version  1.0.10.10
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -143,6 +143,18 @@ static void enqueueOxygen(void);
  */
 static int waitOxygen(const char *buf);
 
+/**
+ * Waits until an H2O molecule is created and returns a code indicating if the operation 
+ * was successful or not. 
+ */
+static int waitMolecule(const char *buf);
+
+/**
+ * Waits until a condition is broadcasted or an interruption signal is raised.
+ */
+static int
+wait(KCondition *condition, const char *buf, const char *context, const char *msg);
+
 #pragma endregion
 
 /** Structure that declares the usual file access functions.  */
@@ -271,17 +283,6 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
       }
       printk("DEBUG:readH2O:  I'm awake %s\n", bufferH2O);
     }
-    while (writtenHydrogens < 2) {
-      printk("DEBUG:readH2O:  Not enough writes. Going to sleep %s\n", bufferH2O);
-      //  The procedure waits for hydrogens to be written to the file
-      if (c_wait(&waitingHydrogen, &mutex)) {
-        printk("<1>read interrupted\n");
-        count = -EINTR;
-        goto finally;
-      }
-      printk("DEBUG:readH2O:  I'm awake %s\n", bufferH2O);
-    }
-
     if (count > size) {
       count = size;
     }
@@ -298,10 +299,9 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
       size--;
     }
   }
-
   finally:
   {
-    c_broadcast(&cond);
+    c_broadcast(&waitingMolecule);
     printk("DEBUG:readH2O:  Broadcasting %s\n", bufferH2O);
     m_unlock(&mutex);
     printk("DEBUG:readH2O:  (((Unlocked))) %s\n", bufferH2O);
@@ -330,15 +330,12 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     if (returnCode != 0) {
       return endWrite(returnCode, buf);
     }
-//    returnCode = enqueueHydrogen(buf);
-//    if (returnCode != 0) {
-//      endWrite(returnCode, buf);
-//    }
     returnCode = writeBytes(count, buf);
     if (returnCode != 0) {
       endWrite(returnCode, buf);
     }
     c_broadcast(&waitingHydrogen);
+    returnCode = waitMolecule(buf);
     while (enqueuedHydrogens < 2) {
       printk("DEBUG:writeH2O: Not enough hydrogens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
@@ -362,6 +359,31 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     printk("DEBUG:writeH2O: (((unlocked))) %s\n", buf);
     return count;
   }
+}
+
+static int waitMolecule(const char *buf) {
+  int returnCode = 0;
+  const char
+      *context = "writeH2O",
+      *msg = "No molecule has been received.";
+  while (enqueuedOxygens == 1) {
+    // The process waits until a molecule is created
+    returnCode = wait(&waitingMolecule, buf, context, msg);
+    c_broadcast(&waitingHydrogen);
+  }
+  return returnCode;
+}
+
+static int
+wait(KCondition *condition, const char *buf, const char *context, const char *msg) {
+  int returnCode = 0;
+  printk("DEBUG:%s: %s. Going to sleep %s\n", context, msg, buf);
+  if (c_wait(&waitingMolecule, &mutex)) {
+    printk("<1>write interrupted\n");
+    returnCode = -EINTR;
+  }
+  printk("DEBUG:%s: I'm awake %s\n", context, buf);
+  return returnCode;
 }
 
 static int waitOxygen(const char *buf) {
