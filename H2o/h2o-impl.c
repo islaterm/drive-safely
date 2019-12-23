@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.12.9
+* @version  1.0.12.10
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -392,9 +392,31 @@ static int waitOxygen(const char *buf) {
     if (hydro1 == NULL && hydro2 == NULL) {
       printk("DEBUG:writeH2O: First hydrogen received %s\n", buf);
       hydro1 = (char *) buf;
+      printk("DEBUG:writeH2O: There's %d enqueued hydrogens %s\n",
+             hydro1 == NULL ? 0 : hydro2 == NULL ? 1 : 2,
+             buf);
+      c_broadcast(&waitingHydrogen);
+      while (hydro1 != NULL || hydro2 != NULL) {
+        printk("DEBUG:writeH2O: Waiting for a molecule. Going to sleep %s\n", buf);
+        if ((c_wait(&waitingMolecule, &mutex))) {
+          return -EINTR;
+        }
+        printk("DEBUG:writeH2O: I'm awake %s\n", buf);
+      }
     } else if (hydro1 != NULL && hydro2 == NULL) {
       printk("DEBUG:writeH2O: Second hydrogen reveived %s\n", buf);
       hydro2 = (char *) buf;
+      printk("DEBUG:writeH2O: There's %d enqueued hydrogens %s\n",
+             hydro1 == NULL ? 0 : hydro2 == NULL ? 1 : 2,
+             buf);
+      c_broadcast(&waitingHydrogen);
+      while (hydro1 != NULL || hydro2 != NULL) {
+        printk("DEBUG:writeH2O: Waiting for a molecule. Going to sleep %s\n", buf);
+        if ((c_wait(&waitingMolecule, &mutex))) {
+          return -EINTR;
+        }
+        printk("DEBUG:writeH2O: I'm awake %s\n", buf);
+      }
     } else {
       while (hydro1 != NULL || hydro2 != NULL) {
         printk("DEBUG:writeH2O: Too much hydrogen. Going to sleep %s\n", buf);
@@ -404,10 +426,6 @@ static int waitOxygen(const char *buf) {
         printk("DEBUG:writeH2O: I'm awake %s\n", buf);
       }
     }
-    printk("DEBUG:writeH2O: There's %d enqueued hydrogens %s\n",
-           hydro1 == NULL ? 0 : hydro2 == NULL ? 1 : 2,
-           buf);
-    c_broadcast(&waitingHydrogen);
   }
   return 0;
 }
