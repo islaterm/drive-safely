@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.10-snapshot
+* @version  1.0.12.1
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
