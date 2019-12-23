@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.12
+* @version  1.0.13.13
 * @since    1.0
 */
 
@@ -172,20 +172,19 @@ void exitH2O(void) {
 }
 
 static int openH2O(struct inode *inode, struct file *pFile) {
-  char *mode = pFile->f_mode & FMODE_WRITE ? "write" :
-               pFile->f_mode & FMODE_READ ? "read" :
-               "unknown";
-  printk("<1>open %p for %s\n", pFile, mode);
+  char *mode = pFile->f_mode & FMODE_WRITE ?
+               "write" : pFile->f_mode & FMODE_READ ?
+                         "read" : "unknown";
+  printk("INFO:openH2O: Open %p for %s\n", pFile, mode);
   return 0;
 }
 
 static int releaseH2O(struct inode *inode, struct file *pFile) {
-  printk("<1>release %p\n", pFile);
+  printk("INFO:releaseH2O: release %p\n", pFile);
   return 0;
 }
 
-static ssize_t readH2O(struct file *pFile, char *buf,
-                       size_t ucount, loff_t *pFilePos) {
+static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFilePos) {
   ssize_t count = ucount;
 
   printk("<1>read %p %ld\n", pFile, count);
