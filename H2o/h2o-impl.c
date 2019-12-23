@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.12.11
+* @version  1.0.12.12
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -144,6 +144,10 @@ static int waitMolecule(const char *buf);
  */
 static int
 wait(KCondition *condition, const char *buf, const char *context, const char *msg);
+
+static ssize_t produceHydrogen(const char *buf);
+
+static ssize_t waitRelease(const char *buf);
 
 #pragma endregion
 
@@ -322,11 +326,12 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   if ((returnCode = waitOxygen(buf)) != 0) {
     return endWrite(returnCode, buf);
   }
-  // TODO: Waits for hydrogen to be produced
+  if ((returnCode = produceHydrogen(buf)) != 0) {
+    return endWrite(returnCode, buf);
+  }
   // TODO: Wait until a molecule is produced
   // Write the hydrogen's data to the module
-  returnCode = writeBytes(count, buf);
-  if (returnCode != 0) {
+  if ((returnCode = writeBytes(count, buf)) != 0) {
     endWrite(returnCode, buf);
   }
   c_broadcast(&waitingHydrogen);
@@ -334,6 +339,33 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
 //    return endWrite(returnCode, buf);
 //  }
   return endWrite(returnCode, buf);
+}
+
+static ssize_t produceHydrogen(const char *buf) {
+  ssize_t returnCode = 0;
+  if (hydro1 == NULL && hydro2 == NULL) {
+    hydro1 = (char *) buf;
+    printk("DEBUG:writeH2O:produceHydrogen: First hydrogen produced %s\n", buf);
+  } else if (hydro1 != NULL && hydro2 == NULL) {
+    hydro2 = (char *) buf;
+    printk("DEBUG:writeH2O:produceHydrogen: Second hydrogen produced %s\n", buf);
+  } else {
+    // Waits until a molecule is formed to produce another oxygen.
+    returnCode = waitRelease(buf);
+  }
+  return returnCode;
+}
+
+static ssize_t waitRelease(const char *buf) {
+  ssize_t returnCode;
+  while (hydro1 != NULL && hydro2 != NULL) {
+    printk("DEBUG:writeH2O:waitRelease:     Too much hydrogen. Going to sleep %s\n", buf);
+    if ((returnCode = waitMolecule(buf)) != 0) {
+      return returnCode;
+    }
+    printk("DEBUG:writeH2O:waitRelease:     I'm awake %s\n", buf);
+  }
+  return produceHydrogen(buf);
 }
 
 static int waitMolecule(const char *buf) {
