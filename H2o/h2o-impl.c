@@ -30,7 +30,7 @@
 * |                           |                           |                           | ``$``                |
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.10.6
+* @version  1.0.10.7
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -351,10 +351,10 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       enqueuedHydrogens++;
       c_broadcast(&waitingHydrogen);
     }
-    returnCode = enqueueHydrogen(buf);
-    if (returnCode != 0) {
-      endWrite(returnCode, buf);
-    }
+//    returnCode = enqueueHydrogen(buf);
+//    if (returnCode != 0) {
+//      endWrite(returnCode, buf);
+//    }
     returnCode = writeBytes(count, buf);
     if (returnCode != 0) {
       endWrite(returnCode, buf);
