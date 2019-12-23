@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.12.1
+* @version  1.0.12.2
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -43,6 +43,12 @@ MODULE_LICENSE("Dual BSD/GPL");
 #pragma region : global declarations
 /** Size of the buffer to store data.   */
 #define MAX_SIZE 8192
+
+typedef struct {
+  char *h1, *h2, *o;
+  bool isComplete;
+} H2O;
+
 #pragma endregion
 
 #pragma region : Declaration of h2o.c functions
@@ -170,9 +176,6 @@ int h2oMajor = 60;
 #pragma region : local variables
 static char *bufferH2O;
 static int in, out, size;
-static const char
-    FALSE = 0,
-    TRUE = 1;
 
 /** H2O's mutex
 */
@@ -182,6 +185,7 @@ static KMutex mutex;
 static KCondition cond, waitingMolecule, waitingHydrogen, waitingOxygen;
 static int enqueuedHydrogens, enqueuedOxygens;
 static int writtenHydrogens;
+static H2O *molecule;
 #pragma endregion
 
 #pragma region : Declaration of the init and exit functions
@@ -214,6 +218,15 @@ int initH2O(void) {
   c_init(&waitingHydrogen);
   c_init(&waitingOxygen);
 
+  molecule = kmalloc(sizeof(H2O *), GFP_KERNEL);
+  if (bufferH2O == NULL) {
+    exitH2O();
+    return -ENOMEM;
+  }
+  molecule->h1 = NULL;
+  molecule->h2 = NULL;
+  molecule->o = NULL;
+  molecule->isComplete = false;
   /* Allocating bufferH2O */
   bufferH2O = kmalloc(MAX_SIZE, GFP_KERNEL);
   if (bufferH2O == NULL) {
@@ -230,6 +243,9 @@ void exitH2O(void) {
   /* Freeing the major number */
   unregister_chrdev(h2oMajor, "h2o");
 
+  if (molecule) {
+    kfree(molecule);
+  }
   /* Freeing buffer h2o */
   if (bufferH2O) {
     kfree(bufferH2O);
