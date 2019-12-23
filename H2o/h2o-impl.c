@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.12.2
+* @version  1.0.12.3
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -43,11 +43,6 @@ MODULE_LICENSE("Dual BSD/GPL");
 #pragma region : global declarations
 /** Size of the buffer to store data.   */
 #define MAX_SIZE 8192
-
-typedef struct {
-  char *h1, *h2, *o;
-  bool isComplete;
-} H2O;
 
 #pragma endregion
 
@@ -120,17 +115,6 @@ int initH2O(void);
 
 #pragma region : Helper functions
 
-/**
- * Enqueues an atom of hydrogen to form a water molecule.
- * If there's already 2 hydrogens in the queue, this function waits until a molecule is
- * created.
- *
- * @param buf
- *     the data contained in the atom.
- * \return 0 if the operation was successful or an error code otherwise.
- */
-static ssize_t enqueueHydrogen(const char *buf);
-
 /** Ends a writing process and returns a code indicating if it was successful or not. */
 static ssize_t endWrite(int code, const char *buf);
 
@@ -184,8 +168,7 @@ static KMutex mutex;
 */
 static KCondition cond, waitingMolecule, waitingHydrogen, waitingOxygen;
 static int enqueuedHydrogens, enqueuedOxygens;
-static int writtenHydrogens;
-static H2O *molecule;
+static char *hydro1, *hydro2, *oxy;
 #pragma endregion
 
 #pragma region : Declaration of the init and exit functions
@@ -210,23 +193,16 @@ int initH2O(void) {
   }
   enqueuedOxygens = 0;
   enqueuedHydrogens = 0;
-  writtenHydrogens = 0;
   in = out = size = 0;
+  hydro1 = NULL;
+  hydro2 = NULL;
+  oxy = NULL;
   m_init(&mutex);
   c_init(&cond);
   c_init(&waitingMolecule);
   c_init(&waitingHydrogen);
   c_init(&waitingOxygen);
 
-  molecule = kmalloc(sizeof(H2O *), GFP_KERNEL);
-  if (bufferH2O == NULL) {
-    exitH2O();
-    return -ENOMEM;
-  }
-  molecule->h1 = NULL;
-  molecule->h2 = NULL;
-  molecule->o = NULL;
-  molecule->isComplete = false;
   /* Allocating bufferH2O */
   bufferH2O = kmalloc(MAX_SIZE, GFP_KERNEL);
   if (bufferH2O == NULL) {
@@ -243,9 +219,6 @@ void exitH2O(void) {
   /* Freeing the major number */
   unregister_chrdev(h2oMajor, "h2o");
 
-  if (molecule) {
-    kfree(molecule);
-  }
   /* Freeing buffer h2o */
   if (bufferH2O) {
     kfree(bufferH2O);
@@ -431,19 +404,6 @@ static ssize_t writeBytes(size_t count, const char *buf) {
     printk("<1>write byte %c (%d) at %d\n", bufferH2O[in], bufferH2O[in], in);
     in = (in + 1) % MAX_SIZE;
     size++;
-  }
-  return 0;
-}
-
-static ssize_t enqueueHydrogen(const char *buf) {
-  while (enqueuedHydrogens >= 2) {
-    printk("DEBUG:writeH2O: Too much hydrogen. Going to sleep %s\n", buf);
-    // The process waits if there's not enough oxygens to form a molecule
-    if (c_wait(&waitingMolecule, &mutex)) {
-      printk("<1>write interrupted\n");
-      return -EINTR;
-    }
-    printk("DEBUG:writeH2O: I'm awake %s\n", buf);
   }
   return 0;
 }
