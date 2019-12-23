@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.12.5
+* @version  1.0.12.6
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -390,7 +390,13 @@ static int waitOxygen(const char *buf) {
       hydro1 = (char *) buf;
     } else if (hydro1 != NULL && hydro2 == NULL) {
       hydro2 = (char *) buf;
-    } // else { wait molecule }
+    } else {
+      while (hydro1 != NULL || hydro2 != NULL) {
+        if ((c_wait(&waitingMolecule, &mutex))) {
+          return -EINTR;
+        }
+      }
+    }
     printk("DEBUG:writeH2O: There's %d enqueued hydrogens %s\n",
            hydro1 == NULL ? 0 : hydro2 == NULL ? 1 : 2,
            buf);
