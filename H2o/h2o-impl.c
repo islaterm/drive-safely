@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.12.7
+* @version  1.0.12.8
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -330,22 +330,22 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     if ((returnCode = waitMolecule(buf)) != 0) {
       return endWrite(returnCode, buf);
     }
-    while (hydro1 == NULL || hydro2 == NULL) {
-      printk("DEBUG:writeH2O: Not enough hydrogens. Going to sleep %s\n", buf);
-      // The process waits if there's not enough oxygens to form a molecule
-      if (c_wait(&waitingHydrogen, &mutex)) {
-        printk("<1>write interrupted\n");
-        count = -EINTR;
-        goto finally;
-      }
-      printk("DEBUG:writeH2O: I'm awake %s\n", buf);
-    }
-    enqueuedHydrogens--;
-    if (enqueuedHydrogens == 0) {
-      printk("DEBUG:writeH2O: Removing  %s\n", buf);
-      enqueuedOxygens--;
-      c_broadcast(&waitingMolecule);
-    }
+//    while (hydro1 == NULL || hydro2 == NULL) {
+//      printk("DEBUG:writeH2O: Not enough hydrogens. Going to sleep %s\n", buf);
+//      // The process waits if there's not enough oxygens to form a molecule
+//      if (c_wait(&waitingHydrogen, &mutex)) {
+//        printk("<1>write interrupted\n");
+//        count = -EINTR;
+//        goto finally;
+//      }
+//      printk("DEBUG:writeH2O: I'm awake %s\n", buf);
+//    }
+//    enqueuedHydrogens--;
+//    if (enqueuedHydrogens == 0) {
+//      printk("DEBUG:writeH2O: Removing  %s\n", buf);
+//      enqueuedOxygens--;
+//      c_broadcast(&waitingMolecule);
+//    }
   }
   finally:
   {
