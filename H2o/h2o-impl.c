@@ -11,26 +11,8 @@
 * When the molecule is created, the read operation returns the concatenation of the
 * parameters given to the write command in FIFO order.
 *
-* Example usage:
-* | Shell 1                   | Shell 2                   | Shell 3                   | Shell 4              |
-* | ------------------------- | ------------------------- | ------------------------- | -------------------- |
-* | ``$ echo abc > /dev/h2o`` |                           |                           |                      |
-* |                           | ``$ echo def > /dev/h2o`` |                           |                      |
-* |                           |                           | ``$ echo ghi > /dev/h2o`` |                      |
-* |                           |                           |                           | ``$ cat < /dev/h20`` |
-* | ``$``                     | ``$``                     |                           | ``abc``              |
-* |                           |                           |                           | ``ghi``              |
-* |                           | ``$ echo jkl > /dev/h2o`` |                           |                      |
-* |                           |                           |                           |                      |
-* | ``$ echo mno > /dev/h2o`` |                           |                           |                      |
-* |                           |                           | ``$ echo pqr > /dev/h20`` |                      |
-* | ``$``                     |                           | ``$``                     | ``mno``              |
-* |                           |                           |                           | ``pqr``              |
-* |                           |                           |                           | ``<Control+C>``      |
-* |                           |                           |                           | ``$``                |
-*
 * @author   Ignacio Slater Muñoz
-* @version  1.0.10.7
+* @version  1.0.10.8
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -69,22 +51,20 @@ MODULE_LICENSE("Dual BSD/GPL");
  * Opens the H2O module.
  * Each time the module is opened, it's file descriptor is different.
  *
- * @param inode
- *     a struct containing the characteristics of the file.
- * @param pFile
- *     the file descriptor.
+ * @param inode a struct containing the characteristics of the file.
+ * @param pFile the file descriptor.
+ *
  * @returns 0 if the operation was succesfull; an error code otherwise.
  */
 static int openH2O(struct inode *inode, struct file *pFile);
 
 /**
  * Closes the H2O module.
+ *
  * Each time the module is opened, it's file descriptor is different.
  *
- * @param inode
- *     a struct containing the characteristics of the file.
- * @param pFile
- *     the file descriptor.
+ * @param inode a struct containing the characteristics of the file.
+ * @param pFile the file descriptor.
  *
  * @returns 0 if the operation was succesfull; an error code otherwise.
  */
@@ -146,7 +126,7 @@ int initH2O(void);
 static ssize_t enqueueHydrogen(const char *buf);
 
 /** Ends a writing process and returns a code indicating if it was successful or not. */
-static void endWrite(int code, const char *buf);
+static ssize_t endWrite(int code, const char *buf);
 
 /**
  * Writes the bytes of buf into the module and returns a code indicating if it was
@@ -156,6 +136,12 @@ static ssize_t writeBytes(size_t count, const char *buf);
 
 /** Adds a new oxygen to the queue and triggers an event.   */
 static void enqueueOxygen(void);
+
+/**
+ * Waits until there's enough atoms of oxygen to create a molecule and returns a code
+ * indicating if the operation was successful or not.
+ */
+static int waitOxygen(const char *buf);
 
 #pragma endregion
 
@@ -338,18 +324,9 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   printk("DEBUG:writeH2O: lock (((aquired))) %s\n", buf);
   try:
   {
-    printk("DEBUG:writeH2O: There's %d enqueued hydrogens %s\n", enqueuedHydrogens, buf);
-    while (enqueuedOxygens < 1) {
-      printk("DEBUG:writeH2O: Not enough oxygens. Going to sleep %s\n", buf);
-      // The process waits if there's not enough oxygens to form a molecule
-      if (c_wait(&waitingOxygen, &mutex)) {
-        printk("<1>write interrupted\n");
-        count = -EINTR;
-        goto finally;
-      }
-      printk("DEBUG:writeH2O: I'm awake %s\n", buf);
-      enqueuedHydrogens++;
-      c_broadcast(&waitingHydrogen);
+    returnCode = waitOxygen(buf);
+    if (returnCode != 0) {
+      return endWrite(returnCode, buf);
     }
 //    returnCode = enqueueHydrogen(buf);
 //    if (returnCode != 0) {
@@ -385,6 +362,23 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   }
 }
 
+static int waitOxygen(const char *buf) {
+  while (enqueuedOxygens < 1) {
+    printk("DEBUG:writeH2O: Not enough oxygens. Going to sleep %s\n", buf);
+    // The process waits if there's not enough oxygens to form a molecule
+    if (c_wait(&waitingOxygen, &mutex)) {
+      printk("<1>write interrupted\n");
+      return -EINTR;
+    }
+    printk("DEBUG:writeH2O: I'm awake %s\n", buf);
+    enqueuedHydrogens++;
+    printk("DEBUG:writeH2O: There's %d enqueued hydrogens %s\n", enqueuedHydrogens,
+           buf);
+    c_broadcast(&waitingHydrogen);
+  }
+  return 0;
+}
+
 #pragma endregion
 
 static ssize_t writeBytes(size_t count, const char *buf) {
@@ -414,9 +408,10 @@ static ssize_t enqueueHydrogen(const char *buf) {
   return 0;
 }
 
-void endWrite(int code, const char *buf) {
+ssize_t endWrite(int code, const char *buf) {
   m_unlock(&mutex);
   printk("DEBUG:writeH2O: (((unlocked))) %s\n", buf);
+  return code;
 }
 
 #pragma endregion
