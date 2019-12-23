@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.12.3
+* @version  1.0.12.4
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -260,8 +260,9 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   enqueueOxygen();
   try:
   {
-    while (enqueuedHydrogens < 2) {
-      printk("DEBUG:readH2O:  There's %d enqueued hydrogens\n%s\n", enqueuedHydrogens,
+    while (hydro1 == NULL && hydro2 == NULL) {
+      printk("DEBUG:readH2O:  There's %d enqueued hydrogens\n%s\n",
+             hydro1 == NULL ? 0 : hydro2 == NULL ? 1 : 2,
              bufferH2O);
       printk("DEBUG:readH2O:  Not enough hydrogens. Going to sleep %s\n", bufferH2O);
       // The procedure waits if there's not enough hydrogens
@@ -299,9 +300,8 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
 }
 
 static void enqueueOxygen(void) {
-  enqueuedOxygens++;
-  printk("DEBUG:readH2O:  there's %d oxygens. Broadcasting %s\n", enqueuedOxygens,
-         bufferH2O);
+  oxy = bufferH2O;
+  printk("DEBUG:readH2O:  There's an oxygen! Broadcasting %s\n", oxy);
   c_broadcast(&waitingOxygen);
 }
 
@@ -376,7 +376,7 @@ wait(KCondition *condition, const char *buf, const char *context, const char *ms
 }
 
 static int waitOxygen(const char *buf) {
-  while (enqueuedOxygens < 1) {
+  while (oxy == NULL) {
     printk("DEBUG:writeH2O: Not enough oxygens. Going to sleep %s\n", buf);
     // The process waits if there's not enough oxygens to form a molecule
     if (c_wait(&waitingOxygen, &mutex)) {
@@ -384,8 +384,13 @@ static int waitOxygen(const char *buf) {
       return -EINTR;
     }
     printk("DEBUG:writeH2O: I'm awake %s\n", buf);
-    enqueuedHydrogens++;
-    printk("DEBUG:writeH2O: There's %d enqueued hydrogens %s\n", enqueuedHydrogens,
+    if (hydro1 == NULL && hydro2 == NULL) {
+      hydro1 = (char *) buf;
+    } else if (hydro1 != NULL && hydro2 == NULL) {
+      hydro2 = (char *) buf;
+    } // else { wait molecule }
+    printk("DEBUG:writeH2O: There's %d enqueued hydrogens %s\n",
+           hydro1 == NULL ? 0 : hydro2 == NULL ? 1 : 2,
            buf);
     c_broadcast(&waitingHydrogen);
   }
