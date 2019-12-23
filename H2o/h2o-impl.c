@@ -30,7 +30,7 @@
 /// |                           |                           |                           | ``$``                |
 ///
 /// \author Ignacio Slater Muñoz
-/// \version 1.0.10.1
+/// \version 1.0.10.4
 /// \since 1.0
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -149,11 +149,10 @@ static ssize_t writeBytes(size_t count, const char *buf);
 
 /// Structure that declares the usual file access functions.
 struct file_operations pH2OFileOperations = {
-    .read =  readH2O,
-    .write =  writeH2O,
-    .open =  openH2O,
-    .release =  releaseH2O
-};
+    .read = readH2O,
+    .write = writeH2O,
+    .open = openH2O,
+    .release = releaseH2O};
 
 /// Major number
 int h2oMajor = 60;
@@ -169,7 +168,7 @@ static const char
 static KMutex mutex;
 /// Mutex conditions
 static KCondition cond, waitingMolecule, waitingHydrogen;
-static int hydrogens, oxygens;
+static int enqueuedHydrogens, oxygens;
 static char formingMolecule;
 // endregion
 
@@ -192,7 +191,7 @@ int initH2O(void) {
     return returnCode;
   }
   oxygens = 0;
-  hydrogens = 0;
+  enqueuedHydrogens = 0;
   in = out = size = 0;
   formingMolecule = FALSE;
   m_init(&mutex);
@@ -254,7 +253,7 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   printk("DEBUG:readH2O:  there's %d oxygens %s\n", oxygens, bufferH2O);
   try:
   {
-    while (hydrogens < 2) {
+    while (enqueuedHydrogens < 2) {
       printk("DEBUG:readH2O:  Not enough hydrogens. Going to sleep %s\n", bufferH2O);
       // The procedure waits if there's not enough hydrogens
       if (c_wait(&waitingHydrogen, &mutex)) {
@@ -303,6 +302,8 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
   printk("DEBUG:writeH2O: lock (((aquired))) %s\n", buf);
   try:
   {
+    enqueuedHydrogens++;
+    printk("DEBUG:writeH2O: There's %d enqueued hydrogens %s\n", enqueuedHydrogens, buf);
     while (oxygens < 1) {
       printk("DEBUG:writeH2O: Not enough oxygens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
@@ -322,10 +323,8 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
     if (returnCode != 0) {
       endWrite(returnCode, buf);
     }
-    hydrogens++;
     c_broadcast(&waitingHydrogen);
-    printk("DEBUG:writeH2O: There's %d hydrogens %s\n", hydrogens, buf);
-    while (hydrogens < 2) {
+    while (enqueuedHydrogens < 2) {
       printk("DEBUG:writeH2O: Not enough hydrogens. Going to sleep %s\n", buf);
       // The process waits if there's not enough oxygens to form a molecule
       if (c_wait(&waitingHydrogen, &mutex)) {
@@ -335,8 +334,8 @@ static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
       }
       printk("DEBUG:writeH2O: I'm awake %s\n", buf);
     }
-    hydrogens--;
-    if (hydrogens == 0) {
+    enqueuedHydrogens--;
+    if (enqueuedHydrogens == 0) {
       printk("DEBUG:writeH2O: Removing  %s\n", buf);
       oxygens--;
       c_broadcast(&waitingMolecule);
@@ -366,7 +365,7 @@ static ssize_t writeBytes(size_t count, const char *buf) {
 }
 
 static ssize_t enqueueHydrogen(const char *buf) {
-  while (hydrogens >= 2) {
+  while (enqueuedHydrogens >= 2) {
     printk("DEBUG:writeH2O: Too much hydrogen. Going to sleep %s\n", buf);
     // The process waits if there's not enough oxygens to form a molecule
     if (c_wait(&waitingMolecule, &mutex)) {
