@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.7
+* @version  1.0.13.8
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -261,10 +261,47 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   if ((returnCode = waitHydrogen()) != 0) {
     return endRead(returnCode);
   }
+  // Creates an H2O molecule
   if ((returnCode = createMolecule(count, buf)) != 0) {
     return endRead(returnCode);
   }
   return endRead(returnCode);
+}
+
+static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
+                        loff_t *pFilePos) {
+  ssize_t returnCode = 0;
+  ssize_t count = ucount;
+
+  printk("INFO:writeH2O: %p %ld\n", pFile, count);
+  m_lock(&mutex);
+  printk("DEBUG:writeH2O: lock (((aquired))) %s\n", buf);
+  if ((returnCode = produceHydrogen(buf)) != 0) {
+    return endWrite(returnCode, buf);
+  }
+  if ((returnCode = writeBytes(count, buf)) != 0) {
+    return endWrite(returnCode, buf);
+  }
+  c_broadcast(&cond);
+  if ((returnCode = waitMolecule(buf)) != 0) {
+    return endWrite(returnCode, buf);
+  }
+  return endWrite(returnCode, buf);
+}
+
+static ssize_t produceHydrogen(const char *buf) {
+  while (hydro1 != NULL && hydro2 != NULL) {
+    if (c_wait(&cond, &mutex)) {
+      printk("INFO:writeH2O:produceHydrogen: Interrupted %s\n", buf);
+      return -EINTR;
+    }
+  }
+  if (hydro1 == NULL && hydro2 == NULL) {
+    hydro1 = (char *) buf;
+  } else {
+    hydro2 = (char *) buf;
+  }
+  return 0;
 }
 
 static ssize_t createMolecule(ssize_t count, char *buf) {
@@ -283,63 +320,9 @@ static ssize_t createMolecule(ssize_t count, char *buf) {
     out = (out + 1) % MAX_SIZE;
     size--;
   }
+  hydro1 = NULL;
+  hydro2 = NULL;
   c_broadcast(&waitingMolecule);
-}
-
-static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
-                        loff_t *pFilePos) {
-  ssize_t returnCode = 0;
-  ssize_t count = ucount;
-
-  printk("INFO:writeH2O: %p %ld\n", pFile, count);
-  m_lock(&mutex);
-  printk("DEBUG:writeH2O: lock (((aquired))) %s\n", buf);
-  if ((returnCode = produceHydrogen(buf)) != 0) {
-    return endWrite(returnCode, buf);
-  }
-  if ((returnCode = writeBytes(count, buf)) != 0) {
-    endWrite(returnCode, buf);
-  }
-  c_broadcast(&waitingHydrogen);
-  returnCode = waitMolecule(buf);
-  while (enqueuedHydrogens < 2) {
-    printk("DEBUG:writeH2O: Not enough hydrogens. Going to sleep %s\n", buf);
-    // The process waits if there's not enough oxygens to form a molecule
-    if (c_wait(&waitingHydrogen, &mutex)) {
-      printk("<1>write interrupted\n");
-      count = -EINTR;
-      goto finally;
-    }
-    printk("DEBUG:writeH2O: I'm awake %s\n", buf);
-
-    enqueuedHydrogens--;
-    if (enqueuedHydrogens == 0) {
-      printk("DEBUG:writeH2O: Removing  %s\n", buf);
-      enqueuedOxygens--;
-      c_broadcast(&waitingMolecule);
-    }
-  }
-  finally:
-  {
-    m_unlock(&mutex);
-    printk("DEBUG:writeH2O: (((unlocked))) %s\n", buf);
-    return count;
-  }
-}
-
-static ssize_t produceHydrogen(const char *buf) {
-  while (hydro1 != NULL && hydro2 != NULL) {
-    if (c_wait(&cond, &mutex)) {
-      printk("INFO:writeH2O:produceHydrogen: Interrupted %s\n", buf);
-      return -EINTR;
-    }
-  }
-  if (hydro1 == NULL && hydro2 == NULL) {
-    hydro1 = (char *) buf;
-  } else {
-    hydro2 = (char *) buf;
-  }
-  return 0;
 }
 
 static ssize_t waitHydrogen(void) {
@@ -359,10 +342,9 @@ static int waitMolecule(const char *buf) {
   const char
       *context = "writeH2O",
       *msg = "No molecule has been received.";
-  while (enqueuedOxygens == 1) {
+  while (hydro1 != NULL || hydro2 != NULL) {
     // The process waits until a molecule is created
     returnCode = wait(&waitingMolecule, buf, context, msg);
-    c_broadcast(&waitingHydrogen);
   }
   return returnCode;
 }
@@ -405,7 +387,8 @@ static ssize_t writeBytes(size_t count, const char *buf) {
       // The buffer's adress is invalid
       return -EFAULT;
     }
-    printk("<1>write byte %c (%d) at %d\n", bufferH2O[in], bufferH2O[in], in);
+    printk("INFO:writeH2O:writeBytes: byte %c (%d) at %d\n", bufferH2O[in], bufferH2O[in],
+           in);
     in = (in + 1) % MAX_SIZE;
     size++;
   }
