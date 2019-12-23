@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.12.8
+* @version  1.0.12.9
 * @since    1.0
 */
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
@@ -310,7 +310,7 @@ static void enqueueOxygen(void) {
 
 static ssize_t writeH2O(struct file *pFile, const char *buf, size_t ucount,
                         loff_t *pFilePos) {
-  int k, returnCode = 0;
+  int returnCode = 0;
   ssize_t count = ucount;
 
   printk("<1>write %p %ld\n", pFile, count);
@@ -390,14 +390,18 @@ static int waitOxygen(const char *buf) {
     }
     printk("DEBUG:writeH2O: I'm awake %s\n", buf);
     if (hydro1 == NULL && hydro2 == NULL) {
+      printk("DEBUG:writeH2O: First hydrogen received %s\n", buf);
       hydro1 = (char *) buf;
     } else if (hydro1 != NULL && hydro2 == NULL) {
+      printk("DEBUG:writeH2O: Second hydrogen reveived %s\n", buf);
       hydro2 = (char *) buf;
     } else {
       while (hydro1 != NULL || hydro2 != NULL) {
+        printk("DEBUG:writeH2O: Too much hydrogen. Going to sleep %s\n", buf);
         if ((c_wait(&waitingMolecule, &mutex))) {
           return -EINTR;
         }
+        printk("DEBUG:writeH2O: I'm awake %s\n", buf);
       }
     }
     printk("DEBUG:writeH2O: There's %d enqueued hydrogens %s\n",
