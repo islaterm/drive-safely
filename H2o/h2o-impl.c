@@ -132,6 +132,8 @@ static ssize_t waitRelease(void);
 
 static ssize_t writeBytes(const char *buf);
 
+static ssize_t produceHydrogen(ssize_t count, const char *buf);
+
 #pragma endregion
 #pragma endregion
 
@@ -228,7 +230,15 @@ static ssize_t writeH2O(struct file *pFile, const char *buf,
   while (size == MAX_SIZE) {
     c_wait(&waitingMolecule, &mutex);
   }
+  if ((response = produceHydrogen(count, buf) != 0)) {
+    return endWrite(response, buf);
+  }
+  c_wait(&waitingMolecule, &mutex);
+  return endWrite(count, buf);
+}
 
+static ssize_t produceHydrogen(ssize_t count, const char *buf) {
+  ssize_t response;
   for (k = 0; k < count; k++) {
     if ((response = waitRelease()) != 0) {
       return endWrite(response, buf);
@@ -237,8 +247,7 @@ static ssize_t writeH2O(struct file *pFile, const char *buf,
       return endWrite(response, buf);
     }
   }
-  c_wait(&waitingMolecule, &mutex);
-  return endWrite(count, buf);
+  return 0;
 }
 
 static ssize_t writeBytes(const char *buf) {
@@ -266,7 +275,7 @@ static ssize_t waitRelease(void) {
 #pragma endregion
 
 static ssize_t createMolecule(char *buf) {
-  for (k = 0; k < 8; k++) {
+  for (k = 0; k < MAX_SIZE; k++) {
     if (copy_to_user(buf + k, bufferH2O + out, 1) != 0) {
       printk("ERROR:readH2O:createMolecule: Invalid adress");
       return -EFAULT;
@@ -281,7 +290,7 @@ static ssize_t createMolecule(char *buf) {
 }
 
 static ssize_t waitHydrogen(void) {
-  while (size < 8) {
+  while (size < MAX_SIZE) {
     if (c_wait(&waitingHydrogen, &mutex)) {
       printk("INFO:readH2O:waitHydrogen: Interrupted.\n");
       return -EINTR;
