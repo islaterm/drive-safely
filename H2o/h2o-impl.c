@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.15
+* @version  1.0.13.6
 * @since    1.0
 */
 
@@ -207,6 +207,7 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
     return endRead(response);
   }
   response = createMolecule(buf);
+  c_broadcast(&waitingHydrogen);
   return endRead(response);
 }
 
