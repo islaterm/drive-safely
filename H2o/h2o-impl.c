@@ -255,6 +255,7 @@ static ssize_t produceHydrogen(ssize_t count, const char *buf) {
 }
 
 static ssize_t writeBytes(const char *buf, int k) {
+  int k;
   if (copy_from_user(bufferH2O + in, buf + k, 1) != 0) {
     return -EFAULT;
   }
