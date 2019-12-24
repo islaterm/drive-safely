@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.9
+* @version  1.0.13.12
 * @since    1.0
 */
 
@@ -255,7 +255,6 @@ static ssize_t produceHydrogen(ssize_t count, const char *buf) {
 }
 
 static ssize_t writeBytes(const char *buf, int k) {
-  int k;
   if (copy_from_user(bufferH2O + in, buf + k, 1) != 0) {
     return -EFAULT;
   }
