@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.8
+* @version  1.0.13.9
 * @since    1.0
 */
 
@@ -130,6 +130,8 @@ static ssize_t createMolecule(char *buf);
 
 static ssize_t waitRelease(void);
 
+static ssize_t writeBytes(const char *buf);
+
 #pragma endregion
 #pragma endregion
 
@@ -208,14 +210,11 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   printk("INFO:readH2O: Read %p %ld\n", pFile, count);
   m_lock(&mutex);
   if ((response = waitHydrogen()) != 0) {
-    c_broadcast(&waitingHydrogen);
     return endRead(response);
   }
   if ((response = createMolecule(buf)) != 0) {
-    c_broadcast(&waitingHydrogen);
     return endRead(response);
   }
-  c_broadcast(&waitingHydrogen);
   return endRead(count);
 }
 
@@ -234,23 +233,24 @@ static ssize_t writeH2O(struct file *pFile, const char *buf,
     if ((response = waitRelease()) != 0) {
       return endWrite(response, buf);
     }
-
-    if (copy_from_user(bufferH2O + in, buf + k, 1) != 0) {
-      /* el valor de buf es una direccion invalida */
-      count = -EFAULT;
-      goto epilog;
+    if ((response = writeBytes(buf)) != 0) {
+      return endWrite(response, buf);
     }
-    printk("<1>write byte %c (%d) at %d\n",
-           bufferH2O[in], bufferH2O[in], in);
-    in = (in + 1) % MAX_SIZE;
-    size++;
-    c_broadcast(&waitingHydrogen);
   }
   c_wait(&waitingMolecule, &mutex);
+  return endWrite(count, buf);
+}
 
-  epilog:
-  m_unlock(&mutex);
-  return count;
+static ssize_t writeBytes(const char *buf) {
+  if (copy_from_user(bufferH2O + in, buf + k, 1) != 0) {
+    return -EFAULT;
+  }
+  printk("INFO:writeH2O:writeBytes: byte %c (%d) at %d\n", bufferH2O[in], bufferH2O[in],
+         in);
+  in = (in + 1) % MAX_SIZE;
+  size++;
+  c_broadcast(&waitingHydrogen);
+  return 0;
 }
 
 static ssize_t waitRelease(void) {
@@ -293,6 +293,7 @@ static ssize_t waitHydrogen(void) {
 #pragma region : ending functions
 
 static ssize_t endRead(ssize_t code) {
+  c_broadcast(&waitingHydrogen);
   return end(code, bufferH2O, "readH2O");
 }
 
