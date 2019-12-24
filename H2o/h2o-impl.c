@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.9
+* @version  1.0-release
 * @since    1.0
 */
 
@@ -118,11 +118,11 @@ int initH2O(void);
 #pragma Helper functions
 
 /// Ends a writing process and returns a code indicating if it was successful or not.
-static ssize_t endWrite(int code, const char *buf);
+static ssize_t endWrite(int code);
 
 static ssize_t endRead(ssize_t code);
 
-static ssize_t end(ssize_t code, char *buf, const char *context);
+static ssize_t end(ssize_t code);
 
 static ssize_t waitHydrogen(void);
 
@@ -231,20 +231,20 @@ static ssize_t writeH2O(struct file *pFile, const char *buf,
     c_wait(&waitingMolecule, &mutex);
   }
   if ((response = produceHydrogen(count, buf) != 0)) {
-    return endWrite(response, buf);
+    return endWrite(response);
   }
   c_wait(&waitingMolecule, &mutex);
-  return endWrite(count, buf);
+  return endWrite(count);
 }
 
 static ssize_t produceHydrogen(ssize_t count, const char *buf) {
   ssize_t response;
   for (k = 0; k < count; k++) {
     if ((response = waitRelease()) != 0) {
-      return endWrite(response, buf);
+      return endWrite(response);
     }
     if ((response = writeBytes(buf)) != 0) {
-      return endWrite(response, buf);
+      return endWrite(response);
     }
   }
   return 0;
@@ -303,14 +303,14 @@ static ssize_t waitHydrogen(void) {
 
 static ssize_t endRead(ssize_t code) {
   c_broadcast(&waitingHydrogen);
-  return end(code, bufferH2O, "readH2O");
+  return end(code);
 }
 
-static ssize_t endWrite(int code, const char *buf) {
-  return end(code, (char *) buf, "writeH2O");
+static ssize_t endWrite(int code) {
+  return end(code);
 }
 
-static ssize_t end(ssize_t code, char *buf, const char *context) {
+static ssize_t end(ssize_t code) {
   m_unlock(&mutex);
   return code;
 }
