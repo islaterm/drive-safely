@@ -12,7 +12,7 @@
 * parameters given to the write command in FIFO order.
 *
 * @author   Ignacio Slater Muñoz
-* @version  1.0.13.7
+* @version  1.0.13.8
 * @since    1.0
 */
 
@@ -128,6 +128,8 @@ static ssize_t waitHydrogen(void);
 
 static ssize_t createMolecule(char *buf);
 
+static ssize_t waitRelease(void);
+
 #pragma endregion
 #pragma endregion
 
@@ -197,6 +199,8 @@ static int releaseH2O(struct inode *inode, struct file *pFile) {
   return 0;
 }
 
+#pragma region Read/Write
+
 static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFilePos) {
   ssize_t count = ucount;
   ssize_t response;
@@ -214,6 +218,52 @@ static ssize_t readH2O(struct file *pFile, char *buf, size_t ucount, loff_t *pFi
   c_broadcast(&waitingHydrogen);
   return endRead(count);
 }
+
+static ssize_t writeH2O(struct file *pFile, const char *buf,
+                        size_t ucount, loff_t *pFilePos) {
+  ssize_t count = ucount;
+  ssize_t response;
+
+  printk("INFO:writeH2O: Write %p %ld\n", pFile, count);
+  m_lock(&mutex);
+  while (size == MAX_SIZE) {
+    c_wait(&waitingMolecule, &mutex);
+  }
+
+  for (k = 0; k < count; k++) {
+    if ((response = waitRelease()) != 0) {
+      return endWrite(response, buf);
+    }
+
+    if (copy_from_user(bufferH2O + in, buf + k, 1) != 0) {
+      /* el valor de buf es una direccion invalida */
+      count = -EFAULT;
+      goto epilog;
+    }
+    printk("<1>write byte %c (%d) at %d\n",
+           bufferH2O[in], bufferH2O[in], in);
+    in = (in + 1) % MAX_SIZE;
+    size++;
+    c_broadcast(&waitingHydrogen);
+  }
+  c_wait(&waitingMolecule, &mutex);
+
+  epilog:
+  m_unlock(&mutex);
+  return count;
+}
+
+static ssize_t waitRelease(void) {
+  while (size == MAX_SIZE) {
+    if (c_wait(&waitingHydrogen, &mutex)) {
+      printk("INFO:writeH2O:waitRelease: Interrupted\n");
+      return -EINTR;
+    }
+  }
+  return 0;
+}
+
+#pragma endregion
 
 static ssize_t createMolecule(char *buf) {
   for (k = 0; k < 8; k++) {
@@ -238,45 +288,6 @@ static ssize_t waitHydrogen(void) {
     }
   }
   return 0;
-}
-
-static ssize_t writeH2O(struct file *pFile, const char *buf,
-                        size_t ucount, loff_t *pFilePos) {
-  ssize_t count = ucount;
-
-  printk("INFO:writeH2O: Write %p %ld\n", pFile, count);
-  m_lock(&mutex);
-  while (size == MAX_SIZE) {
-    c_wait(&waitingMolecule, &mutex);
-  }
-
-  for (k = 0; k < count; k++) {
-    while (size == MAX_SIZE) {
-      /* si el buffer esta lleno, el escritor espera */
-      if (c_wait(&waitingHydrogen, &mutex)) {
-        printk("<1>write interrupted\n");
-        count = -EINTR;
-        goto epilog;
-      }
-    }
-
-
-    if (copy_from_user(bufferH2O + in, buf + k, 1) != 0) {
-      /* el valor de buf es una direccion invalida */
-      count = -EFAULT;
-      goto epilog;
-    }
-    printk("<1>write byte %c (%d) at %d\n",
-           bufferH2O[in], bufferH2O[in], in);
-    in = (in + 1) % MAX_SIZE;
-    size++;
-    c_broadcast(&waitingHydrogen);
-  }
-  c_wait(&waitingMolecule, &mutex);
-
-  epilog:
-  m_unlock(&mutex);
-  return count;
 }
 
 #pragma region : ending functions
